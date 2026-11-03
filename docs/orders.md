@@ -164,6 +164,8 @@ nombre, teléfono ni dirección del cliente (el checkout ya los tiene).
 
 ## Relación con 6B (checkout y WhatsApp)
 
+Implementado en la Fase 6B: ver [checkout.md](checkout.md).
+
 1. Generar `clientRequestId` al iniciar el intento y conservarlo en reintentos.
 2. Enviar `expectedSubtotalCents` con el subtotal mostrado; ante `PRICE_CHANGED`,
    mostrar el nuevo monto y pedir confirmación.

@@ -6,6 +6,8 @@
 - Búsqueda y filtros del catálogo: [docs/catalog.md](docs/catalog.md)
 - Carrito (formato, hidratación y frontera de seguridad): [docs/cart.md](docs/cart.md)
 - Creación segura de pedidos (`create_order`, errores, idempotencia): [docs/orders.md](docs/orders.md)
+- Checkout, confirmación y WhatsApp: [docs/checkout.md](docs/checkout.md)
+- Pruebas unitarias: `npm test` (node --test, archivos `*.test.ts`)
 
 ## UI/UX Design System
 

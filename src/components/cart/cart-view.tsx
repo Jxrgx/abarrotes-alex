@@ -9,21 +9,13 @@ import { ProductImage } from "@/components/store/product-image";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { effectivePrice } from "@/lib/catalog/pricing";
-import type { CartProductInfo, CartResolveResponse, CartState } from "@/lib/cart/schema";
+import { type CartLineStatus, resolveCartLines } from "@/lib/cart/lines";
+import type { CartProductInfo, CartState } from "@/lib/cart/schema";
 import { announceCart, countLabel, dispatchCart, useCart } from "@/lib/cart/store";
 import { formatCents } from "@/lib/format";
 
 import { QuantityStepper } from "./quantity-stepper";
-
-type Resolution = {
-  key: string;
-  branchId: string | null;
-  /** Ids consultados: los que no regresaron ya no están disponibles. */
-  requested: Set<string>;
-  data: CartResolveResponse;
-};
-
-type LineStatus = "loading" | "ok" | "soldOut" | "unavailable";
+import { useCartResolution } from "./use-cart-resolution";
 
 export function CartView() {
   const cart = useCart();
@@ -47,23 +39,7 @@ export function CartView() {
   if (!resolution && failed) return <CartError onRetry={retry} />;
   if (!resolution) return <CartSkeleton lines={Math.min(cart.items.length, 4)} />;
 
-  const branchUnavailable = resolution.data.branch === null;
-  const lines = cart.items.map((item) => {
-    const info = resolution.data.products.find((product) => product.productId === item.productId);
-    let status: LineStatus = "ok";
-    if (!resolution.requested.has(item.productId)) status = "loading";
-    else if (!info) status = "unavailable";
-    else if (!info.isAvailable) status = "soldOut";
-    return { item, info, status };
-  });
-
-  const payable = lines.filter((line) => line.status === "ok" && line.info);
-  const subtotalCents = payable.reduce(
-    (total, line) => total + effectivePrice({ price: line.info!.priceCents, promoPrice: line.info!.promoPriceCents }) * line.item.quantity,
-    0,
-  );
-  const payableCount = payable.reduce((total, line) => total + line.item.quantity, 0);
-  const blocked = lines.some((line) => line.status === "soldOut" || line.status === "unavailable");
+  const { lines, subtotalCents, payableCount, blocked, branchUnavailable } = resolveCartLines(cart, resolution);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8">
@@ -108,59 +84,6 @@ export function CartView() {
 }
 
 // ---------------------------------------------------------------------------
-// Resolución por lote de datos actuales (POST /api/carrito)
-// ---------------------------------------------------------------------------
-
-function useCartResolution(cart: CartState | null) {
-  const [resolution, setResolution] = useState<Resolution | null>(null);
-  const [failure, setFailure] = useState<{ key: string; attempt: number } | null>(null);
-  const [attempt, setAttempt] = useState(0);
-
-  const ids = cart?.items.map((item) => item.productId) ?? [];
-  const branchId = cart?.branchId ?? null;
-  // Solo se consulta si hay productos que todavía no se resolvieron (o cambió la
-  // sucursal). Cambiar cantidades o quitar productos no genera otra consulta.
-  const needsFetch =
-    branchId !== null &&
-    ids.length > 0 &&
-    (!resolution || resolution.branchId !== branchId || ids.some((id) => !resolution.requested.has(id)));
-  const fetchKey = needsFetch ? `${branchId}|${[...ids].sort().join(",")}` : null;
-
-  useEffect(() => {
-    if (!fetchKey) return;
-    const controller = new AbortController();
-    const [branchId, idList] = fetchKey.split("|");
-    const productIds = idList.split(",");
-
-    fetch("/api/carrito", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ branchId, productIds }),
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = (await response.json()) as CartResolveResponse;
-        setResolution({ key: fetchKey, branchId, requested: new Set(productIds), data });
-      })
-      .catch(() => {
-        // El carrito local no se toca: solo falla la consulta de datos actuales.
-        if (!controller.signal.aborted) setFailure({ key: fetchKey, attempt });
-      });
-
-    return () => controller.abort();
-  }, [fetchKey, attempt]);
-
-  const failed = fetchKey !== null && failure?.key === fetchKey && failure.attempt === attempt;
-  return {
-    resolution,
-    loading: fetchKey !== null && !failed,
-    failed,
-    retry: () => setAttempt((value) => value + 1),
-  };
-}
-
-// ---------------------------------------------------------------------------
 
 function CartLine({
   item,
@@ -169,7 +92,7 @@ function CartLine({
 }: {
   item: CartState["items"][number];
   info: CartProductInfo | undefined;
-  status: LineStatus;
+  status: CartLineStatus;
 }) {
   if (status === "loading") return <LineSkeleton />;
 
@@ -311,13 +234,15 @@ function CartSummary({
           Quita los productos agotados o no disponibles para continuar.
         </p>
       )}
-      {/* El proceso de pedido llega en la siguiente fase. */}
-      <Button size="lg" className="mt-4 w-full" disabled aria-describedby="carrito-continuar-ayuda">
-        Continuar pedido
-      </Button>
-      <p id="carrito-continuar-ayuda" className="mt-2 text-center text-xs text-subtle-foreground">
-        Muy pronto podrás enviar tu pedido desde aquí.
-      </p>
+      {blocked ? (
+        <Button size="lg" className="mt-4 w-full" disabled>
+          Continuar pedido
+        </Button>
+      ) : (
+        <Link href="/checkout" className={buttonVariants({ size: "lg", className: "mt-4 w-full" })}>
+          Continuar pedido
+        </Link>
+      )}
     </section>
   );
 }
