@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { branchShortName, getCurrentBranch } from "@/lib/catalog/branches";
 
 import { CartButton } from "./cart-button";
-import { SearchField } from "./search-field";
+import { SearchField, SearchForm } from "./search-field";
 
 export function SiteHeader() {
   return (
@@ -39,7 +39,11 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <SearchField id="busqueda-desktop" className="hidden flex-1 md:block md:max-w-xl" />
+        <Suspense
+          fallback={<SearchForm id="busqueda-desktop" className="hidden flex-1 md:block md:max-w-xl" />}
+        >
+          <SearchField id="busqueda-desktop" className="hidden flex-1 md:block md:max-w-xl" />
+        </Suspense>
 
         <div className="ml-auto flex items-center gap-4">
           <div className="hidden items-center gap-2 text-sm lg:flex">
@@ -59,7 +63,9 @@ export function SiteHeader() {
 
       {/* Móvil: búsqueda siempre visible, sin abrir menús. */}
       <div className="page-container pb-3 md:hidden">
-        <SearchField id="busqueda-movil" />
+        <Suspense fallback={<SearchForm id="busqueda-movil" />}>
+          <SearchField id="busqueda-movil" />
+        </Suspense>
       </div>
     </header>
   );

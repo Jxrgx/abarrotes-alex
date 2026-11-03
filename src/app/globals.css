@@ -210,6 +210,11 @@
     outline-offset: 2px;
   }
 
+  /* Con un panel modal abierto (p. ej. filtros en móvil) la página no se desplaza. */
+  html:has(dialog[open]:modal) {
+    overflow: hidden;
+  }
+
   ::selection {
     background-color: var(--primary-soft);
     color: var(--foreground);

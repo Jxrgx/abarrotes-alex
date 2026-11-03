@@ -48,16 +48,40 @@ const BRANCH_PRODUCT_SELECT = `
   promotions ( promotional_price )
 `;
 
+export type ProductQuery = {
+  categorySlug?: string;
+  subcategoryId?: string;
+  brandId?: string;
+  /** Cada término debe coincidir en el nombre del producto o en su marca. */
+  search?: { term: string; brandIds: string[] }[];
+};
+
+// Los filtros se aplican en PostgreSQL sobre el embed `product` (con !inner,
+// filtrar el embed filtra las filas de branch_products).
 export const getBranchProducts = cache(
-  async (branchId: string, categorySlug?: string): Promise<CatalogProduct[]> => {
+  async (branchId: string, filters: ProductQuery = {}): Promise<CatalogProduct[]> => {
     const supabase = await createClient();
     let query = supabase
       .from("branch_products")
       .select(BRANCH_PRODUCT_SELECT)
       .eq("branch_id", branchId);
 
-    if (categorySlug) {
-      query = query.eq("product.subcategory.category.slug", categorySlug);
+    if (filters.categorySlug) {
+      query = query.eq("product.subcategory.category.slug", filters.categorySlug);
+    }
+    if (filters.subcategoryId) {
+      query = query.eq("product.subcategory_id", filters.subcategoryId);
+    }
+    if (filters.brandId) {
+      query = query.eq("product.brand_id", filters.brandId);
+    }
+    // ILIKE es insensible a mayúsculas (incluidas las acentuadas). Cada término debe
+    // aparecer al inicio de una palabra del nombre (o ser una marca que coincide).
+    // Los términos ya vienen saneados (sin comas, paréntesis ni comodines).
+    for (const { term, brandIds } of filters.search ?? []) {
+      const conditions = [`name.ilike.${term}*`, `name.ilike.* ${term}*`, `name.ilike.*-${term}*`];
+      if (brandIds.length > 0) conditions.push(`brand_id.in.(${brandIds.join(",")})`);
+      query = query.or(conditions.join(","), { referencedTable: "product" });
     }
 
     const { data, error } = await query;
@@ -97,6 +121,39 @@ export const getBranchProducts = cache(
       .map(({ item }) => item);
   },
 );
+
+// Pares marca/subcategoría de todos los productos visibles de la sucursal.
+// Sirven para ofrecer solo subcategorías y marcas que tienen productos.
+export const getBranchFacets = cache(async (branchId: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("branch_products")
+    .select("product:products!inner ( brand_id, subcategory_id )")
+    .eq("branch_id", branchId);
+
+  if (error) throw catalogQueryError("los filtros", error);
+  return data.map((row) => ({
+    brandId: row.product.brand_id,
+    subcategoryId: row.product.subcategory_id,
+  }));
+});
+
+// Precio que ve el cliente: el promocional si hay oferta visible.
+export function effectivePrice(product: CatalogProduct) {
+  return product.promoPrice ?? product.price;
+}
+
+// El orden por precio efectivo se hace en el servidor de Next.js: el precio
+// promocional sale de otra tabla y, con cientos de productos, ordenar en memoria
+// es más simple que una vista o función SQL. Desempate estable por nombre.
+export function sortProducts(products: CatalogProduct[], order: "precio-asc" | "precio-desc" | undefined) {
+  if (!order) return products;
+  const direction = order === "precio-asc" ? 1 : -1;
+  return [...products].sort(
+    (a, b) =>
+      direction * (effectivePrice(a) - effectivePrice(b)) || a.name.localeCompare(b.name, "es"),
+  );
+}
 
 // No es un motor de promociones: la BD decide qué promociones son visibles.
 // Solo se elige la más baja y se ignora una que no sea realmente menor al precio.

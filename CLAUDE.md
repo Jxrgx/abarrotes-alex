@@ -3,6 +3,7 @@
 # Abarrotes Alex
 
 - Modelo de datos y Supabase: [docs/database.md](docs/database.md)
+- Búsqueda y filtros del catálogo: [docs/catalog.md](docs/catalog.md)
 
 ## UI/UX Design System
 

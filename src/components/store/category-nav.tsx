@@ -13,6 +13,8 @@ import Link from "next/link";
 import type { Category } from "@/lib/catalog/categories";
 import { cn } from "@/lib/utils";
 
+import { PendingHint } from "./pending-hint";
+
 // Representación visual por slug. Las categorías nuevas usan el icono genérico.
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   bebidas: CupSoda,
@@ -28,20 +30,27 @@ type CategoryNavProps = {
   activeSlug?: string | null;
   showAll?: boolean;
   label?: string;
+  /** URL de cada chip (null = "Todos"). Por defecto, /productos?categoria=<slug>. */
+  getHref?: (slug: string | null) => string;
 };
+
+function defaultHref(slug: string | null) {
+  return slug ? `/productos?categoria=${encodeURIComponent(slug)}` : "/productos";
+}
 
 export function CategoryNav({
   categories,
   activeSlug,
   showAll = false,
   label = "Categorías",
+  getHref = defaultHref,
 }: CategoryNavProps) {
   return (
     <nav aria-label={label}>
       <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
         {showAll && (
           <li className="shrink-0">
-            <CategoryChip href="/productos" icon={LayoutGrid} active={activeSlug === null}>
+            <CategoryChip href={getHref(null)} icon={LayoutGrid} active={activeSlug === null}>
               Todos
             </CategoryChip>
           </li>
@@ -49,7 +58,7 @@ export function CategoryNav({
         {categories.map((category) => (
           <li key={category.id} className="shrink-0">
             <CategoryChip
-              href={`/productos?categoria=${encodeURIComponent(category.slug)}`}
+              href={getHref(category.slug)}
               icon={CATEGORY_ICONS[category.slug] ?? ShoppingBasket}
               active={activeSlug === category.slug}
             >
@@ -91,7 +100,9 @@ function CategoryChip({
         )}
         aria-hidden="true"
       >
-        <Icon className="size-4" />
+        <PendingHint>
+          <Icon className="size-4" />
+        </PendingHint>
       </span>
       {children}
     </Link>
