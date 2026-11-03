@@ -2,7 +2,7 @@ import "server-only";
 
 import type { PostgrestError } from "@supabase/supabase-js";
 
-import { createClient } from "@/lib/supabase/server";
+import { getPublicSupabase } from "@/lib/supabase/public";
 
 import {
   type CheckoutRequest,
@@ -24,7 +24,9 @@ export async function createOrder(input: CheckoutRequest): Promise<CreateOrderRe
   }
 
   const delivery = input.delivery;
-  const supabase = await createClient();
+  // create_order no depende de la identidad del usuario: siempre se invoca como
+  // anon (cliente público, sin cookies). Su seguridad está en la propia función.
+  const supabase = getPublicSupabase();
   const { data, error } = await supabase.rpc("create_order", {
     p_client_request_id: input.clientRequestId,
     p_branch_id: input.branchId,

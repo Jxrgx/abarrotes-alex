@@ -84,8 +84,10 @@ src/
 │   └── ui/              # Componentes de shadcn/ui (se agregan conforme se necesiten)
 ├── lib/
 │   ├── supabase/
+│   │   ├── public.ts    # Cliente público del servidor (sin cookies, anon): catálogo y create_order
+│   │   ├── server.ts    # Cliente SSR con cookies: Auth y datos que dependen de la sesión
+│   │   ├── proxy.ts     # Refresco de sesión en src/proxy.ts (solo /admin)
 │   │   ├── client.ts    # Cliente para Client Components (navegador)
-│   │   ├── server.ts    # Cliente para Server Components / Server Functions / Route Handlers
 │   │   └── env.ts       # Lectura y validación de variables de Supabase
 │   └── utils.ts         # Utilidad `cn` para clases de Tailwind
 └── types/               # Tipos compartidos (p. ej. tipos generados de la base de datos)

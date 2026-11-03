@@ -9,6 +9,7 @@ PostgreSQL en Supabase. El esquema se define solo con migraciones SQL en
 | `20261103000200_rls_policies.sql`      | Row Level Security, políticas de lectura pública y privilegios |
 | `20261103000300_explicit_role_optional_brand.sql` | `profiles.role` sin default; `products.brand_id` opcional |
 | `20261103000400_create_order.sql` | `orders.client_request_id`, esquema `private` y función `public.create_order` ([orders.md](orders.md)) |
+| `20261103000500_admin_auth.sql` | `private.is_admin()`, políticas administrativas, privilegios y trigger de historial ([auth.md](auth.md)) |
 
 ```bash
 npx supabase start        # requiere Docker
@@ -32,6 +33,27 @@ npx supabase db push --remote                 # aplicar migraciones pendientes
   los vuelve a ejecutar; `seed.sql` no es idempotente.
 - Para comprobar la conexión de la app: `npm run check:supabase` (consulta las
   sucursales activas con la llave pública; no imprime URL ni llaves).
+
+## Clientes de Supabase en la aplicación
+
+Hay dos clientes de servidor con responsabilidades distintas. **No se mezclan.**
+
+| Cliente | Archivo | Credencial | Cookies / sesión | Rol en la base | Uso |
+| --- | --- | --- | --- | --- | --- |
+| **Público** | `src/lib/supabase/public.ts` → `getPublicSupabase()` | Llave publishable | No lee cookies ni carga sesión | Siempre `anon` (RLS pública) | Catálogo, sucursales, horarios, promociones (`src/lib/catalog/*`), `POST /api/carrito` y la RPC `create_order` (`POST /api/pedidos`) |
+| **SSR autenticado** | `src/lib/supabase/server.ts` → `createClient()` | Llave publishable | Lee y escribe las cookies de sesión (`@supabase/ssr`) | `authenticated` con el JWT del usuario | Auth (login/logout), `/admin`, `getAdminContext()` y cualquier dato que dependa de la sesión |
+
+Reglas:
+
+- **Datos públicos → cliente público.** No depende de la request: no fuerza
+  render dinámico por cookies, no hace que Supabase Auth cargue una sesión (que
+  compararía su expiración con `Date.now()` durante el prerender) y comparte una
+  sola instancia entre requests. Sus consultas quedan listas para `"use cache"` en
+  el futuro, porque nunca mezclan datos de un usuario.
+- **Datos de sesión → cliente SSR**, siempre después de `await connection()`
+  (ver `getAdminContext()` en [auth.md](auth.md)).
+- Ninguno usa `service_role` ni secretos. Aunque un admin tenga sesión abierta,
+  la tienda pública consulta como `anon`.
 
 ## Entidades
 
@@ -204,10 +226,11 @@ Lectura pública (`anon` y `authenticated`), solo `SELECT`:
 | `branch_products` | sucursal y producto visibles (incluye `is_available = false` para mostrar "agotado") |
 | `promotions`      | `is_active`, dentro de `starts_at`/`ends_at` y su `branch_product` visible |
 
-Sin ninguna política (inaccesibles vía API): `profiles`, `orders`,
-`order_items`, `order_status_history`. No hay INSERT público de pedidos: se crean
-únicamente con la función `public.create_order` (`SECURITY DEFINER`, recalcula
-precios en la base, transaccional). Ver [orders.md](orders.md).
+Para el público (anon y usuarios sin rol admin) siguen inaccesibles `profiles`,
+`orders`, `order_items` y `order_status_history`: solo el admin los lee (y cada
+usuario su propio profile). No hay INSERT público de pedidos: se crean únicamente
+con `public.create_order` (`SECURITY DEFINER`, recalcula precios en la base,
+transaccional). Ver [orders.md](orders.md) y [auth.md](auth.md).
 
 Privilegios adicionales (defensa en profundidad): se revocan a `anon`
 INSERT/UPDATE/DELETE/TRUNCATE en las tablas de `public` (TRUNCATE no pasa por
@@ -224,14 +247,14 @@ políticas en `storage.objects`. `products.image_path` guarda el object path y l
 URL se construye en el cliente (`supabase.storage.from('product-images').getPublicUrl(path)`).
 Se pospone porque sus políticas de escritura dependen de la definición de roles de Auth.
 
-## Pendiente para la fase de Auth
+## Autorización administrativa
 
-- Crear `profiles` (trigger en `auth.users` o alta manual por un admin). Como
-  `role` no tiene default, el mecanismo elegido debe asignarlo explícitamente.
-- Función de rol (p. ej. `public.is_admin()` `security definer` con `search_path`
-  fijo) o custom claims en el JWT, y con ella las políticas de escritura del
-  catálogo y de lectura/actualización de pedidos.
+Implementada en la Fase 7: `private.is_admin()`, políticas para el admin, profiles
+sin escritura vía API y registro automático de cambios de estado. Ver [auth.md](auth.md).
+
+Pendiente:
+
 - Decidir si `employee` se restringe a una sucursal (requeriría relacionar profiles con branches).
-- Registrar automáticamente cambios de estado en `order_status_history`.
+- Validar transiciones de estado de pedidos (Fase 8).
 - Opcional: impedir promociones activas traslapadas para un mismo `branch_product`
   (hoy la aplicación debe elegir una) y validar `promotional_price < price`.

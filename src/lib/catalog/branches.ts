@@ -1,6 +1,6 @@
 import { cache } from "react";
 
-import { createClient } from "@/lib/supabase/server";
+import { getPublicSupabase } from "@/lib/supabase/public";
 
 import { catalogQueryError } from "./errors";
 
@@ -19,7 +19,7 @@ export type BranchHours = {
 };
 
 export const getActiveBranches = cache(async (): Promise<Branch[]> => {
-  const supabase = await createClient();
+  const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("branches")
     .select("id, name, address, phone")
@@ -41,7 +41,7 @@ export const getCurrentBranch = cache(async () => {
 });
 
 export const getBranchHours = cache(async (branchId: string): Promise<BranchHours[]> => {
-  const supabase = await createClient();
+  const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("branch_hours")
     .select("day_of_week, opening_time, closing_time, is_closed")

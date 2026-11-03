@@ -1,7 +1,7 @@
 import { cache } from "react";
 
 import { formatPresentation, formatUnit } from "@/lib/format";
-import { createClient } from "@/lib/supabase/server";
+import { getPublicSupabase } from "@/lib/supabase/public";
 import type { Database } from "@/types/database";
 
 import { catalogQueryError } from "./errors";
@@ -64,7 +64,7 @@ export type ProductQuery = {
 // filtrar el embed filtra las filas de branch_products).
 export const getBranchProducts = cache(
   async (branchId: string, filters: ProductQuery = {}): Promise<CatalogProduct[]> => {
-    const supabase = await createClient();
+    const supabase = getPublicSupabase();
     let query = supabase
       .from("branch_products")
       .select(BRANCH_PRODUCT_SELECT)
@@ -133,7 +133,7 @@ export const getBranchProducts = cache(
 // Pares marca/subcategoría de todos los productos visibles de la sucursal.
 // Sirven para ofrecer solo subcategorías y marcas que tienen productos.
 export const getBranchFacets = cache(async (branchId: string) => {
-  const supabase = await createClient();
+  const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("branch_products")
     .select("product:products!inner ( brand_id, subcategory_id )")

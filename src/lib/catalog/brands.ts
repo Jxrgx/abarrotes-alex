@@ -1,6 +1,6 @@
 import { cache } from "react";
 
-import { createClient } from "@/lib/supabase/server";
+import { getPublicSupabase } from "@/lib/supabase/public";
 
 import { catalogQueryError } from "./errors";
 
@@ -11,7 +11,7 @@ export type Brand = {
 };
 
 export const getActiveBrands = cache(async (): Promise<Brand[]> => {
-  const supabase = await createClient();
+  const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("brands")
     .select("id, name, slug")

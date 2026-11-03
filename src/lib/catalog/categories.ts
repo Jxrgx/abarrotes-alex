@@ -1,6 +1,6 @@
 import { cache } from "react";
 
-import { createClient } from "@/lib/supabase/server";
+import { getPublicSupabase } from "@/lib/supabase/public";
 
 import { catalogQueryError } from "./errors";
 
@@ -12,7 +12,7 @@ export type Category = {
 
 // RLS ya limita a categorías activas; el filtro explícito documenta la intención.
 export const getActiveCategories = cache(async (): Promise<Category[]> => {
-  const supabase = await createClient();
+  const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("categories")
     .select("id, name, slug")
@@ -33,7 +33,7 @@ export type Subcategory = {
 
 // Todas las subcategorías visibles (RLS: activas y de categoría activa). Son pocas.
 export const getActiveSubcategories = cache(async (): Promise<Subcategory[]> => {
-  const supabase = await createClient();
+  const supabase = getPublicSupabase();
   const { data, error } = await supabase
     .from("subcategories")
     .select("id, category_id, name, slug")
