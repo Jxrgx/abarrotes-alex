@@ -13,15 +13,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Abarrotes Alex",
-  description: "Tienda de abarrotes en línea.",
+  title: {
+    default: "Abarrotes Alex",
+    template: "%s | Abarrotes Alex",
+  },
+  description:
+    "Abarrotes Alex: bebidas, botanas, lácteos, limpieza y más. Arma tu pedido y envíalo por WhatsApp.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es-MX"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // Scroll suave solo para anclas (#productos); Next.js lo desactiva al navegar entre rutas.
+      data-scroll-behavior="smooth"
+      className={`${geistSans.variable} ${geistMono.variable} h-full scroll-smooth antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

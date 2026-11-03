@@ -40,6 +40,13 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_URL`      | URL del proyecto de Supabase                  |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Llave pública (anon) del proyecto de Supabase |
 
+`NEXT_PUBLIC_SUPABASE_URL` debe ser la URL base (`https://<ref>.supabase.co`),
+sin `/rest/v1` ni otro path. Para comprobar la conexión:
+
+```bash
+npm run check:supabase
+```
+
 `.env.local` está ignorado por git. Nunca agregues la `service_role` key a una
 variable `NEXT_PUBLIC_*`: esas variables se exponen al navegador.
 
@@ -61,7 +68,8 @@ y un seed de desarrollo en `supabase/seed.sql`. Detalle del modelo en
 
 ```bash
 npx supabase start     # base local (requiere Docker)
-npx supabase db reset  # aplica migraciones desde cero + seed
+npx supabase db reset  # aplica migraciones desde cero + seed (solo local)
+npx supabase db push --remote  # aplica migraciones pendientes al proyecto vinculado
 ```
 
 ## Estructura general

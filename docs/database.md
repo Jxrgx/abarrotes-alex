@@ -11,8 +11,26 @@ PostgreSQL en Supabase. El esquema se define solo con migraciones SQL en
 
 ```bash
 npx supabase start        # requiere Docker
-npx supabase db reset     # aplica migraciones desde cero + seed.sql
+npx supabase db reset     # aplica migraciones desde cero + seed.sql (SOLO local)
 ```
+
+### Proyecto remoto
+
+El repositorio está vinculado con `supabase link` (el ref vive en
+`supabase/.temp/`, ignorado por git). Flujo para desplegar cambios:
+
+```bash
+npx supabase migration list --remote          # comparar local vs remoto
+npx supabase db push --remote --dry-run       # revisar qué se aplicará
+npx supabase db push --remote                 # aplicar migraciones pendientes
+```
+
+- **Nunca** usar `db reset` contra el remoto.
+- El seed de desarrollo se cargó una vez con `db push --remote --include-seed`.
+  El CLI registra los seeds aplicados en `supabase_migrations.seed_files` y no
+  los vuelve a ejecutar; `seed.sql` no es idempotente.
+- Para comprobar la conexión de la app: `npm run check:supabase` (consulta las
+  sucursales activas con la llave pública; no imprime URL ni llaves).
 
 ## Entidades
 
