@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Abarrotes Alex
 
-## Getting Started
+Aplicación web de Abarrotes Alex: tienda pública y panel administrativo, diseñada como multisucursal.
 
-First, run the development server:
+> Estado actual: base del proyecto. Todavía no hay funcionalidades de negocio.
+
+## Stack
+
+- Next.js 16 (App Router) + React 19
+- TypeScript (modo `strict`)
+- Tailwind CSS 4 + shadcn/ui
+- Supabase (PostgreSQL, Auth, Storage) mediante `@supabase/ssr`
+- Zod + React Hook Form
+
+## Requisitos
+
+- Node.js 20.9 o superior (desarrollado con Node 24)
+- npm 10 o superior
+- Un proyecto de Supabase (URL y anon key)
+
+## Instalación
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <url-del-repositorio>
+cd abarrotes-alex
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variables de entorno
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Copia el archivo de ejemplo y llena los valores de tu proyecto de Supabase
+(Supabase Dashboard → Project Settings → API):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.example .env.local
+```
 
-## Learn More
+| Variable                        | Descripción                                   |
+| ------------------------------- | --------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | URL del proyecto de Supabase                  |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Llave pública (anon) del proyecto de Supabase |
 
-To learn more about Next.js, take a look at the following resources:
+`.env.local` está ignorado por git. Nunca agregues la `service_role` key a una
+variable `NEXT_PUBLIC_*`: esas variables se exponen al navegador.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Desarrollo
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev        # servidor de desarrollo en http://localhost:3000
+npm run lint       # ESLint
+npm run typecheck  # verificación de tipos con TypeScript
+npm run build      # build de producción
+npm run start      # sirve el build de producción
+```
 
-## Deploy on Vercel
+## Base de datos
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+El esquema se define con migraciones SQL de Supabase CLI en `supabase/migrations/`
+y un seed de desarrollo en `supabase/seed.sql`. Detalle del modelo en
+[docs/database.md](docs/database.md).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx supabase start     # base local (requiere Docker)
+npx supabase db reset  # aplica migraciones desde cero + seed
+```
+
+## Estructura general
+
+```
+src/
+├── app/                 # Rutas (App Router). Server Components por defecto.
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── globals.css      # Tailwind + tema de shadcn/ui
+├── components/
+│   └── ui/              # Componentes de shadcn/ui (se agregan conforme se necesiten)
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts    # Cliente para Client Components (navegador)
+│   │   ├── server.ts    # Cliente para Server Components / Server Functions / Route Handlers
+│   │   └── env.ts       # Lectura y validación de variables de Supabase
+│   └── utils.ts         # Utilidad `cn` para clases de Tailwind
+└── types/               # Tipos compartidos (p. ej. tipos generados de la base de datos)
+```
+
+Para agregar un componente de shadcn/ui:
+
+```bash
+npx shadcn@latest add <componente>
+```
