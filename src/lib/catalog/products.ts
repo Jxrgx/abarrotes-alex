@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
 import { catalogQueryError } from "./errors";
+import { effectivePrice } from "./pricing";
 
 type SaleType = Database["public"]["Enums"]["sale_type"];
 type ProductUnit = Database["public"]["Enums"]["product_unit"];
@@ -12,6 +13,7 @@ type ProductUnit = Database["public"]["Enums"]["product_unit"];
 export type CatalogProduct = {
   /** id de branch_products: el producto dentro de una sucursal. */
   id: string;
+  branchId: string;
   productId: string;
   name: string;
   slug: string;
@@ -52,6 +54,8 @@ export type ProductQuery = {
   categorySlug?: string;
   subcategoryId?: string;
   brandId?: string;
+  /** Resolución por lote (carrito): solo estos productos. */
+  productIds?: string[];
   /** Cada término debe coincidir en el nombre del producto o en su marca. */
   search?: { term: string; brandIds: string[] }[];
 };
@@ -75,6 +79,9 @@ export const getBranchProducts = cache(
     if (filters.brandId) {
       query = query.eq("product.brand_id", filters.brandId);
     }
+    if (filters.productIds) {
+      query = query.in("product_id", filters.productIds);
+    }
     // ILIKE es insensible a mayúsculas (incluidas las acentuadas). Cada término debe
     // aparecer al inicio de una palabra del nombre (o ser una marca que coincide).
     // Los términos ya vienen saneados (sin comas, paréntesis ni comodines).
@@ -95,6 +102,7 @@ export const getBranchProducts = cache(
           sortKey: [subcategory.category.sort_order, subcategory.sort_order] as const,
           item: {
             id: row.id,
+            branchId,
             productId: product.id,
             name: product.name,
             slug: product.slug,
@@ -137,11 +145,6 @@ export const getBranchFacets = cache(async (branchId: string) => {
     subcategoryId: row.product.subcategory_id,
   }));
 });
-
-// Precio que ve el cliente: el promocional si hay oferta visible.
-export function effectivePrice(product: CatalogProduct) {
-  return product.promoPrice ?? product.price;
-}
 
 // El orden por precio efectivo se hace en el servidor de Next.js: el precio
 // promocional sale de otra tabla y, con cientos de productos, ordenar en memoria

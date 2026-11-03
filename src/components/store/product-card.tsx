@@ -1,5 +1,4 @@
-import { Plus } from "lucide-react";
-
+import { AddToCart } from "@/components/cart/add-to-cart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CatalogProduct } from "@/lib/catalog/products";
@@ -60,16 +59,17 @@ export function ProductCard({ product, headingLevel: Heading = "h3" }: ProductCa
           />
         </div>
 
-        {/* El carrito llega en la Fase 5: por ahora el botón no tiene acción. */}
         {soldOut ? (
           <Button disabled className="mt-3 w-full">
             Agotado
           </Button>
         ) : (
-          <Button className="mt-3 w-full" aria-label={`Agregar ${imageAlt}`}>
-            <Plus aria-hidden="true" />
-            Agregar
-          </Button>
+          <AddToCart
+            className="mt-3"
+            productId={product.productId}
+            branchId={product.branchId}
+            label={imageAlt}
+          />
         )}
       </div>
     </article>

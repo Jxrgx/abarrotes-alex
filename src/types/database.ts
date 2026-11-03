@@ -289,6 +289,7 @@ export type Database = {
           address_references: string | null
           branch_id: string
           cash_amount: number | null
+          client_request_id: string | null
           created_at: string
           customer_name: string
           customer_notes: string | null
@@ -309,6 +310,7 @@ export type Database = {
           address_references?: string | null
           branch_id: string
           cash_amount?: number | null
+          client_request_id?: string | null
           created_at?: string
           customer_name: string
           customer_notes?: string | null
@@ -329,6 +331,7 @@ export type Database = {
           address_references?: string | null
           branch_id?: string
           cash_amount?: number | null
+          client_request_id?: string | null
           created_at?: string
           customer_name?: string
           customer_notes?: string | null
@@ -528,6 +531,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_order: {
+        Args: {
+          p_address?: string
+          p_address_references?: string
+          p_branch_id: string
+          p_cash_amount?: number
+          p_client_request_id: string
+          p_customer_name: string
+          p_customer_notes?: string
+          p_customer_phone: string
+          p_delivery_type: Database["public"]["Enums"]["delivery_type"]
+          p_expected_subtotal?: number
+          p_items: Json
+          p_neighborhood?: string
+          p_payment_method?: Database["public"]["Enums"]["payment_method"]
+        }
+        Returns: Json
+      }
       next_order_folio: { Args: never; Returns: string }
     }
     Enums: {

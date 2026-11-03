@@ -8,6 +8,7 @@ PostgreSQL en Supabase. El esquema se define solo con migraciones SQL en
 | `20261103000100_initial_schema.sql`    | Tipos, tablas, constraints, índices, folios, triggers         |
 | `20261103000200_rls_policies.sql`      | Row Level Security, políticas de lectura pública y privilegios |
 | `20261103000300_explicit_role_optional_brand.sql` | `profiles.role` sin default; `products.brand_id` opcional |
+| `20261103000400_create_order.sql` | `orders.client_request_id`, esquema `private` y función `public.create_order` ([orders.md](orders.md)) |
 
 ```bash
 npx supabase start        # requiere Docker
@@ -204,8 +205,9 @@ Lectura pública (`anon` y `authenticated`), solo `SELECT`:
 | `promotions`      | `is_active`, dentro de `starts_at`/`ends_at` y su `branch_product` visible |
 
 Sin ninguna política (inaccesibles vía API): `profiles`, `orders`,
-`order_items`, `order_status_history`. No hay INSERT público de pedidos: se
-creará una operación server-side controlada en una fase posterior.
+`order_items`, `order_status_history`. No hay INSERT público de pedidos: se crean
+únicamente con la función `public.create_order` (`SECURITY DEFINER`, recalcula
+precios en la base, transaccional). Ver [orders.md](orders.md).
 
 Privilegios adicionales (defensa en profundidad): se revocan a `anon`
 INSERT/UPDATE/DELETE/TRUNCATE en las tablas de `public` (TRUNCATE no pasa por
@@ -230,9 +232,6 @@ Se pospone porque sus políticas de escritura dependen de la definición de role
   fijo) o custom claims en el JWT, y con ella las políticas de escritura del
   catálogo y de lectura/actualización de pedidos.
 - Decidir si `employee` se restringe a una sucursal (requeriría relacionar profiles con branches).
-- Operación server-side de creación de pedidos (función `security definer` o
-  Route Handler con `service_role`) que valide precios contra `branch_products`
-  y promociones, calcule subtotales y registre el primer `order_status_history`.
 - Registrar automáticamente cambios de estado en `order_status_history`.
 - Opcional: impedir promociones activas traslapadas para un mismo `branch_product`
   (hoy la aplicación debe elegir una) y validar `promotional_price < price`.

@@ -16,6 +16,11 @@ export function formatPrice(value: number) {
   return priceFormatter.format(value);
 }
 
+// Montos en centavos enteros (carrito): 1850 -> $18.50
+export function formatCents(cents: number) {
+  return priceFormatter.format(cents / 100);
+}
+
 export function formatUnit(unit: ProductUnit, quantity = 1) {
   if (unit === "pieza") return quantity === 1 ? "pieza" : "piezas";
   return unit;

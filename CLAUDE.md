@@ -4,6 +4,8 @@
 
 - Modelo de datos y Supabase: [docs/database.md](docs/database.md)
 - Búsqueda y filtros del catálogo: [docs/catalog.md](docs/catalog.md)
+- Carrito (formato, hidratación y frontera de seguridad): [docs/cart.md](docs/cart.md)
+- Creación segura de pedidos (`create_order`, errores, idempotencia): [docs/orders.md](docs/orders.md)
 
 ## UI/UX Design System
 

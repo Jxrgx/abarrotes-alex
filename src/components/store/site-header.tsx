@@ -18,7 +18,7 @@ export function SiteHeader() {
       </a>
 
       <div className="page-container flex h-16 items-center gap-3 md:gap-6">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5 rounded-lg">
+        <Link href="/" className="flex min-h-10 min-w-0 items-center gap-2.5 rounded-lg">
           {/* Espacio reservado para el logo definitivo. */}
           <span
             className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-base font-semibold text-primary-foreground"
@@ -57,7 +57,7 @@ export function SiteHeader() {
               </span>
             </span>
           </div>
-          <CartButton count={0} />
+          <CartButton />
         </div>
       </div>
 
