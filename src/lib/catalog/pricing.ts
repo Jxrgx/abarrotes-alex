@@ -11,3 +11,11 @@ export function toCents(value: number) {
 export function effectivePrice<T extends number>(product: { price: T; promoPrice: T | null }) {
   return product.promoPrice ?? product.price;
 }
+
+// "1512.50" (numeric serializado como texto) -> 151250 sin pasar por punto flotante.
+export function decimalToCents(value: string) {
+  const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(value);
+  if (!match) throw new Error("Monto inválido");
+  const cents = Number(match[2]) * 100 + Number((match[3] ?? "").padEnd(2, "0"));
+  return match[1] ? -cents : cents;
+}

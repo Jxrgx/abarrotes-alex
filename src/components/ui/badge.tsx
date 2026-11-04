@@ -13,6 +13,9 @@ const badgeVariants = cva(
         brand: "bg-primary-soft text-primary-dark",
         offer: "bg-destructive-soft text-destructive-strong",
         soldOut: "bg-background text-foreground ring-1 ring-border",
+        success: "bg-success-soft text-success-strong",
+        warning: "bg-warning-soft text-warning-strong",
+        danger: "bg-destructive-soft text-destructive-strong",
       },
     },
     defaultVariants: {

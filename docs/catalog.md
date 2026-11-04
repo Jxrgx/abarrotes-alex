@@ -33,21 +33,67 @@ Todos se combinan (intersección). La lógica pura vive en
 - **Quitar un chip** elimina solo ese filtro. Quitar la categoría también quita la subcategoría.
 - **Limpiar filtros** quita búsqueda, categoría, subcategoría y marca; conserva el orden.
 
-## Búsqueda
+## Búsqueda completa (`/productos?q=`)
 
-- Explícita (Enter), sin resultados instantáneos ni autocompletado.
+- Server-side en PostgreSQL; se combina con categoría, subcategoría, marca y orden.
 - Cada palabra (máx. 5) debe coincidir **al inicio de una palabra** del nombre del
-  producto o de su marca: `cola` encuentra "Refresco de cola", pero `late` no encuentra
-  "chocolate". Se usa `ILIKE` (insensible a mayúsculas, también acentuadas en la
-  collation `en_US.UTF-8` de Supabase).
+  producto, de su marca, de su subcategoría o de su categoría: `cola` encuentra
+  "Refresco de cola" (pero `late` no encuentra "chocolate"); `lacteos` encuentra los
+  productos de "Lácteos".
+- **Sin acentos** (Fase 4C): el nombre se busca en `products.search_name`, columna
+  generada con `unaccent` + minúsculas (migración `…000600`); el término se normaliza
+  igual en la aplicación (`normalizeSearchText`: NFD sin diacríticos + minúsculas).
+  `jabon`, `JABÓN` y `jabón` encuentran "Jabón". Marcas, subcategorías y categorías se
+  comparan con la misma normalización en el servidor (sus ids van en el `or`).
 - El texto se normaliza (NFC) y solo conserva letras, números, espacios, `-`, `.` y `'`;
   así no llegan caracteres con significado en los filtros de PostgREST.
 - **Desde el header**: en `/productos` la búsqueda conserva categoría, subcategoría,
   marca y orden (los filtros activos quedan visibles como chips y el estado vacío
   ofrece "Buscar en todos los productos"). Desde cualquier otra página empieza una
   búsqueda nueva en `/productos?q=…`.
-- **Pendiente**: búsqueda sin acentos (`jabon` → "Jabón"). Requiere la extensión
-  `unaccent` (disponible en Supabase, no instalada), es decir, una migración.
+
+## Búsqueda instantánea (Fase 4C)
+
+Autocomplete del campo "Buscar productos..." con **Fuse.js 7.5.0**. Es una mejora
+progresiva: la búsqueda completa de arriba sigue existiendo y es la que se usa con
+Enter o "Ver todos".
+
+```
+GET /api/busqueda (cliente público, 1 consulta) → índice ligero → Fuse.js en el navegador → ≤ 6 resultados
+```
+
+- **Índice** (`LiveSearchItem`): id, slug, nombre, presentación, marca, categoría y
+  subcategoría (nombre y slug), `image_path`, precio y precio promocional en centavos,
+  disponibilidad. Sin datos administrativos ni de pedidos. ~350 bytes por producto
+  (12 productos ≈ 4 KB). Se pide **una vez por visita** al enfocar el campo; caché
+  `public, max-age=60`. No hay consultas por tecla.
+- **Normalización**: minúsculas, sin acentos y puntuación como espacio
+  (`"Coca-Cola"` → `"coca cola"`) solo para comparar; el texto mostrado no cambia.
+- **Configuración** (`src/lib/catalog/live-search.ts`): pesos nombre 0.55, marca 0.25,
+  subcategoría 0.15, categoría 0.05; `threshold` 0.4 con `ignoreLocation` para tolerar
+  errores (`cocacla`, `japnes`); después solo se conservan resultados con score
+  ≤ mejor + 0.15 (`RELATIVE_SCORE_WINDOW`), lo que elimina coincidencias lejanas
+  (`coca` ya no trae "Cacahuate"). Mínimo **2 caracteres**, máximo **6 resultados**.
+- **Resultados**: miniatura/placeholder, nombre + presentación, marca, precio efectivo
+  (misma `effectivePrice` del catálogo) con el anterior tachado si hay oferta, y
+  "Agotado" cuando corresponde. Sin controles de carrito.
+- **Elegir un resultado** → `/productos?producto=<id>`: la tarjeta se desplaza al
+  centro y se resalta ~2.4 s (`ProductFocus`). `producto` es solo ayuda visual (UUID
+  validado; uno inválido se ignora; no filtra ni cambia precios). Desde `/productos`
+  se conservan los filtros que no excluyen al producto (misma categoría,
+  subcategoría o marca) y el orden; `q` se descarta porque Fuse es difuso y la
+  búsqueda completa podría no incluir el resultado.
+- **Teclado** (patrón combobox de WAI-ARIA, `aria-activedescendant` + listbox):
+  ↓/↑ recorren las opciones (circular, incluida "Ver todos"); Enter abre la opción
+  activa o, sin opción activa, hace la búsqueda completa (nunca elige la primera
+  sola); Esc cierra y deja el foco en el campo; Tab no se intercepta. Clic o toque
+  fuera cierra. Los cambios de resultados se anuncian en una región `aria-live`.
+- **Si el índice falla**, el panel solo ofrece "Ver todos" y Enter sigue llevando a
+  `/productos?q=…`.
+- **Escala**: pensado para 100–500 productos (≈ 175 KB sin comprimir en el peor caso).
+  Con un catálogo mucho mayor habría que buscar en el servidor por tecla.
+- **Fuzzy vs. completa**: Fuse tolera errores (`cocacla` → Coca-Cola); PostgreSQL no.
+  Ambas ignoran acentos y mayúsculas, así que `jabon` encuentra lo mismo en las dos.
 
 ## Consultas
 

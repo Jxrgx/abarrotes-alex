@@ -534,6 +534,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_dashboard: {
+        Args: {
+          p_branch_id: string
+          p_pending_statuses: Database["public"]["Enums"]["order_status"][]
+          p_recent_limit?: number
+          p_time_zone: string
+          p_top_days?: number
+          p_top_limit?: number
+        }
+        Returns: Json
+      }
       create_order: {
         Args: {
           p_address?: string

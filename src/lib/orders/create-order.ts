@@ -2,6 +2,7 @@ import "server-only";
 
 import type { PostgrestError } from "@supabase/supabase-js";
 
+import { decimalToCents } from "@/lib/catalog/pricing";
 import { getPublicSupabase } from "@/lib/supabase/public";
 
 import {
@@ -50,14 +51,6 @@ export async function createOrder(input: CheckoutRequest): Promise<CreateOrderRe
 // Centavos enteros -> número con 2 decimales exactos en JSON (1999 -> 19.99).
 function centsToNumeric(cents: number | undefined) {
   return cents === undefined ? undefined : cents / 100;
-}
-
-// "1512.50" -> 151250 sin pasar por punto flotante.
-export function decimalToCents(value: string) {
-  const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(value);
-  if (!match) throw new Error("Monto inválido");
-  const cents = Number(match[2]) * 100 + Number((match[3] ?? "").padEnd(2, "0"));
-  return match[1] ? -cents : cents;
 }
 
 // Columnas de create_order -> rutas del request (para marcar campos en el formulario).

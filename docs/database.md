@@ -10,6 +10,8 @@ PostgreSQL en Supabase. El esquema se define solo con migraciones SQL en
 | `20261103000300_explicit_role_optional_brand.sql` | `profiles.role` sin default; `products.brand_id` opcional |
 | `20261103000400_create_order.sql` | `orders.client_request_id`, esquema `private` y función `public.create_order` ([orders.md](orders.md)) |
 | `20261103000500_admin_auth.sql` | `private.is_admin()`, políticas administrativas, privilegios y trigger de historial ([auth.md](auth.md)) |
+| `20261103000600_search_unaccent.sql` | Extensión `unaccent`, `private.search_normalize()` y columna generada `products.search_name` (búsqueda sin acentos, [catalog.md](catalog.md)) |
+| `20261103000700_admin_dashboard.sql` | `public.admin_dashboard()` (métricas del panel, `SECURITY INVOKER`, solo admin; [admin.md](admin.md)) |
 
 ```bash
 npx supabase start        # requiere Docker
