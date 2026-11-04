@@ -19,7 +19,11 @@ export function ProductCard({ product, headingLevel: Heading = "h3" }: ProductCa
   const imageAlt = [product.name, product.presentation].filter(Boolean).join(" ");
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-xl border bg-card transition-shadow duration-200 ease-out hover:shadow-card-hover">
+    <article
+      // data-product-id: destino de /productos?producto=<id> (ProductFocus).
+      data-product-id={product.productId}
+      className="flex h-full scroll-mt-36 flex-col overflow-hidden rounded-xl border bg-card transition-shadow duration-200 ease-out outline-none hover:shadow-card-hover data-[highlight=true]:ring-2 data-[highlight=true]:ring-primary data-[highlight=true]:ring-offset-2 data-[highlight=true]:ring-offset-background md:scroll-mt-24"
+    >
       <div className="relative">
         <ProductImage
           imagePath={product.imagePath}

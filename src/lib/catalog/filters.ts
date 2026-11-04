@@ -1,3 +1,5 @@
+import { normalizeSearchText } from "./normalize";
+
 // Estado del catálogo representado en la URL (/productos?q=&categoria=&subcategoria=&marca=&orden=).
 // Módulo puro: lo usan tanto Server Components como los Client Components de filtros.
 
@@ -43,18 +45,21 @@ export function sanitizeSearch(value: string | undefined) {
   return clean || undefined;
 }
 
-// Cada palabra debe coincidir (en nombre o marca): "refresco cola" encuentra "Refresco de cola".
+// Cada palabra debe coincidir (en nombre, marca, categoría o subcategoría):
+// "refresco cola" encuentra "Refresco de cola". Los términos van normalizados
+// (minúsculas, sin acentos) para compararse con products.search_name.
 export function searchTerms(q: string | undefined) {
   if (!q) return [];
-  return [...new Set(q.toLocaleLowerCase("es").split(" "))]
+  return [...new Set(normalizeSearchText(q).split(" "))]
     .filter((term) => term.replace(/[.'-]/g, "").length > 0)
     .slice(0, MAX_SEARCH_TERMS);
 }
 
-// Coincidencia al inicio de palabra: "cola" encuentra "Refresco de cola" y
-// "Coca-Cola", pero no "chocolate". Misma regla que los patrones ILIKE de products.ts.
+// Coincidencia al inicio de palabra, sin distinguir acentos: "cola" encuentra
+// "Refresco de cola" y "Coca-Cola" pero no "chocolate"; "lacteos" encuentra
+// "Lácteos". Misma regla que los patrones ILIKE de products.ts. `term` ya normalizado.
 export function matchesWordStart(text: string, term: string) {
-  const haystack = text.toLocaleLowerCase("es");
+  const haystack = normalizeSearchText(text);
   return (
     haystack.startsWith(term) || haystack.includes(` ${term}`) || haystack.includes(`-${term}`)
   );
@@ -86,6 +91,22 @@ export function catalogHref(filters: CatalogFilters) {
   if (filters.orden) params.set("orden", filters.orden);
   const query = params.toString();
   return query ? `${CATALOG_PATH}?${query}` : CATALOG_PATH;
+}
+
+// ?producto=<id>: ayuda visual de navegación (scroll + resaltado de una tarjeta)
+// al elegir un resultado de la búsqueda instantánea. No filtra, no cambia precios
+// ni disponibilidad. Un valor que no sea UUID se ignora.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function parseProductFocus(value: string | string[] | undefined) {
+  const id = first(value)?.toLowerCase();
+  return id && UUID_PATTERN.test(id) ? id : undefined;
+}
+
+export function productFocusHref(filters: CatalogFilters, productId: string) {
+  const href = catalogHref(filters);
+  const separator = href.includes("?") ? "&" : "?";
+  return `${href}${separator}producto=${encodeURIComponent(productId)}`;
 }
 
 // ---------------------------------------------------------------------------

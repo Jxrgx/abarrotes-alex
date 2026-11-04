@@ -368,6 +368,7 @@ export type Database = {
           name: string
           presentation: number | null
           sale_type: Database["public"]["Enums"]["sale_type"]
+          search_name: string | null
           slug: string
           subcategory_id: string
           unit: Database["public"]["Enums"]["product_unit"] | null
@@ -383,6 +384,7 @@ export type Database = {
           name: string
           presentation?: number | null
           sale_type?: Database["public"]["Enums"]["sale_type"]
+          search_name?: string | null
           slug: string
           subcategory_id: string
           unit?: Database["public"]["Enums"]["product_unit"] | null
@@ -398,6 +400,7 @@ export type Database = {
           name?: string
           presentation?: number | null
           sale_type?: Database["public"]["Enums"]["sale_type"]
+          search_name?: string | null
           slug?: string
           subcategory_id?: string
           unit?: Database["public"]["Enums"]["product_unit"] | null

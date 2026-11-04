@@ -6,6 +6,7 @@ import { type ActiveFilterChip, ActiveFilters, SubcategoryNav } from "@/componen
 import { DesktopFilterControls, MobileFilterButton } from "@/components/store/catalog-filters";
 import { CategoryNav } from "@/components/store/category-nav";
 import { EmptyState } from "@/components/store/empty-state";
+import { ProductFocus } from "@/components/store/product-focus";
 import { ProductGrid } from "@/components/store/product-list";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentBranch } from "@/lib/catalog/branches";
@@ -16,6 +17,7 @@ import {
   catalogHref,
   matchesWordStart,
   parseCatalogParams,
+  parseProductFocus,
   resolveCatalogFilters,
   searchTerms,
   subcategoriesInScope,
@@ -35,7 +37,10 @@ export async function generateMetadata({ searchParams }: PageProps<"/productos">
 }
 
 export default async function ProductsPage({ searchParams }: PageProps<"/productos">) {
-  const raw = parseCatalogParams(await searchParams);
+  const params = await searchParams;
+  const raw = parseCatalogParams(params);
+  // ?producto=<id>: solo ayuda visual (scroll + resaltado) al venir de la búsqueda instantánea.
+  const focusProductId = parseProductFocus(params.producto);
   const [branch, categories, subcategories, brands] = await Promise.all([
     getCurrentBranch(),
     getActiveCategories(),
@@ -61,10 +66,18 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
     brands,
   });
 
-  // Un término coincide con el nombre del producto o con su marca (al inicio de palabra).
+  // Un término coincide con el nombre del producto, su marca, su subcategoría o su
+  // categoría (al inicio de palabra y sin distinguir acentos: "lacteos" -> "Lácteos").
+  const categoryNames = new Map(categories.map((item) => [item.id, item.name]));
   const search = searchTerms(filters.q).map((term) => ({
     term,
     brandIds: brands.filter((item) => matchesWordStart(item.name, term)).map((item) => item.id),
+    subcategoryIds: subcategories
+      .filter(
+        (item) =>
+          matchesWordStart(item.name, term) || matchesWordStart(categoryNames.get(item.categoryId) ?? "", term),
+      )
+      .map((item) => item.id),
   }));
 
   const [products, facets] = await Promise.all([
@@ -170,6 +183,7 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
             Lista de productos
           </h2>
           <ProductGrid products={results} />
+          {focusProductId && <ProductFocus productId={focusProductId} />}
         </section>
       ) : filters.q ? (
         <EmptyState

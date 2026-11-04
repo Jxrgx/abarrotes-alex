@@ -18,6 +18,7 @@ export type CatalogProduct = {
   name: string;
   slug: string;
   brandName: string | null;
+  brandSlug: string | null;
   presentation: string | null;
   saleType: SaleType;
   /** Unidad del precio en venta por peso ("kg"); null en venta por pieza. */
@@ -29,6 +30,7 @@ export type CatalogProduct = {
   /** Precio promocional visible (RLS ya filtra vigencia); null si no hay oferta. */
   promoPrice: number | null;
   category: { name: string; slug: string };
+  subcategory: { name: string; slug: string };
 };
 
 // Una sola consulta por sucursal con todo lo necesario para la tarjeta:
@@ -41,9 +43,9 @@ const BRANCH_PRODUCT_SELECT = `
   is_available,
   product:products!inner (
     id, name, slug, presentation, unit, sale_type, image_path, is_featured,
-    brand:brands ( name ),
+    brand:brands ( name, slug ),
     subcategory:subcategories!inner (
-      sort_order,
+      name, slug, sort_order,
       category:categories!inner ( name, slug, sort_order )
     )
   ),
@@ -56,8 +58,11 @@ export type ProductQuery = {
   brandId?: string;
   /** Resolución por lote (carrito): solo estos productos. */
   productIds?: string[];
-  /** Cada término debe coincidir en el nombre del producto o en su marca. */
-  search?: { term: string; brandIds: string[] }[];
+  /**
+   * Cada término (normalizado: minúsculas, sin acentos) debe coincidir en el nombre
+   * del producto, su marca o su subcategoría/categoría (ids resueltos por el llamador).
+   */
+  search?: { term: string; brandIds: string[]; subcategoryIds: string[] }[];
 };
 
 // Los filtros se aplican en PostgreSQL sobre el embed `product` (con !inner,
@@ -82,12 +87,18 @@ export const getBranchProducts = cache(
     if (filters.productIds) {
       query = query.in("product_id", filters.productIds);
     }
-    // ILIKE es insensible a mayúsculas (incluidas las acentuadas). Cada término debe
-    // aparecer al inicio de una palabra del nombre (o ser una marca que coincide).
+    // search_name = nombre en minúsculas y sin acentos (columna generada con unaccent),
+    // así "jabon" encuentra "Jabón". Cada término debe aparecer al inicio de una
+    // palabra del nombre, o ser una marca/subcategoría/categoría que coincide.
     // Los términos ya vienen saneados (sin comas, paréntesis ni comodines).
-    for (const { term, brandIds } of filters.search ?? []) {
-      const conditions = [`name.ilike.${term}*`, `name.ilike.* ${term}*`, `name.ilike.*-${term}*`];
+    for (const { term, brandIds, subcategoryIds } of filters.search ?? []) {
+      const conditions = [
+        `search_name.ilike.${term}*`,
+        `search_name.ilike.* ${term}*`,
+        `search_name.ilike.*-${term}*`,
+      ];
       if (brandIds.length > 0) conditions.push(`brand_id.in.(${brandIds.join(",")})`);
+      if (subcategoryIds.length > 0) conditions.push(`subcategory_id.in.(${subcategoryIds.join(",")})`);
       query = query.or(conditions.join(","), { referencedTable: "product" });
     }
 
@@ -107,6 +118,7 @@ export const getBranchProducts = cache(
             name: product.name,
             slug: product.slug,
             brandName: product.brand?.name ?? null,
+            brandSlug: product.brand?.slug ?? null,
             presentation: formatPresentation(product.presentation, product.unit),
             saleType: product.sale_type,
             priceUnit: priceUnitFor(product.sale_type, product.unit),
@@ -116,6 +128,7 @@ export const getBranchProducts = cache(
             price: row.price,
             promoPrice: bestPromoPrice(row.price, row.promotions),
             category: { name: subcategory.category.name, slug: subcategory.category.slug },
+            subcategory: { name: subcategory.name, slug: subcategory.slug },
           } satisfies CatalogProduct,
         };
       })
