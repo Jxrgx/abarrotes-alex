@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { controlClassName } from "@/components/ui/field";
 import { setProductActive, setProductAvailability, saveProduct } from "@/lib/admin/product-actions";
-import { matchesProductSearch, parseProductForm } from "@/lib/admin/product-forms";
+import { matchesProductSearch, validateProductSubmission } from "@/lib/admin/product-forms";
 import type { AdminProduct, ProductFormOptions } from "@/lib/admin/products";
 import { formatCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -263,18 +263,19 @@ export function ProductManager({ products, options, branchId }: {
         open={editing !== null}
         size="lg"
         onClose={() => setEditing(null)}
-        onSaved={(message) => {
+        onSaved={(message, warning) => {
           setEditing(null);
           toast(message);
+          if (warning) toast(warning, "error");
         }}
         title={formTitle}
         description={editing?.mode === "duplicate" && source ? `Basado en «${source.name}». No se guarda hasta que pulses «Crear producto».` : undefined}
         submitLabel={editing?.mode === "edit" ? "Guardar cambios" : "Crear producto"}
         action={saveProduct}
-        validate={parseProductForm}
+        validate={validateProductSubmission}
         hidden={editing?.mode === "edit" && source ? { id: source.id } : editing?.mode === "duplicate" ? { mode: "duplicate" } : undefined}
       >
-        {({ fieldErrors }) => editing && <ProductFields mode={editing.mode} source={source} options={options} fieldErrors={fieldErrors} />}
+        {({ fieldErrors, pending }) => editing && <ProductFields mode={editing.mode} source={source} options={options} fieldErrors={fieldErrors} pending={pending} />}
       </CatalogFormDialog>
 
       <DeactivateDialog

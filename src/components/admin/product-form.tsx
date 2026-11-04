@@ -1,11 +1,13 @@
 "use client";
 
-import { Info } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { ImagePlus, Info, RefreshCw, Trash2, Undo2 } from "lucide-react";
+import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { ProductImage } from "@/components/store/product-image";
 import { controlClassName, Field, fieldDescribedBy } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 import type { FieldErrors } from "@/lib/admin/catalog-forms";
+import { IMAGE_ACCEPTED_TYPES, type ImageAction, validateImageFile } from "@/lib/admin/image-rules";
 import {
   normalizePresentation,
   PRODUCT_NAME_MAX,
@@ -32,12 +34,13 @@ const WEIGHT_NOTE =
 
 // Campos del formulario de producto. Solo estado de UX (selects dependientes,
 // avisos); la validación real la repite la Server Action.
-export function ProductFields({ mode, source, options, fieldErrors }: {
+export function ProductFields({ mode, source, options, fieldErrors, pending = false }: {
   mode: ProductFormMode;
   /** Producto a editar o a duplicar; null en alta. */
   source: AdminProduct | null;
   options: ProductFormOptions;
   fieldErrors: FieldErrors;
+  pending?: boolean;
 }) {
   const editing = mode === "edit";
   const [name, setName] = useState(mode === "duplicate" && source ? `Copia de ${source.name}` : (source?.name ?? ""));
@@ -77,10 +80,6 @@ export function ProductFields({ mode, source, options, fieldErrors }: {
   return (
     <>
       <Section title="Información">
-        <div className="flex items-start gap-3">
-          <ProductImage imagePath={mode === "edit" ? (source?.imagePath ?? null) : null} alt="" variant="thumb" className="size-14 shrink-0 rounded-lg border" />
-          <p className="pt-1 text-sm text-subtle-foreground">Las imágenes se administrarán en la siguiente fase.</p>
-        </div>
         <Field id="producto-nombre" label="Nombre" required hint={nameHint} error={fieldErrors.name}>
           <input
             id="producto-nombre"
@@ -96,6 +95,16 @@ export function ProductFields({ mode, source, options, fieldErrors }: {
             className={cn(controlClassName, "h-11")}
           />
         </Field>
+      </Section>
+
+      <Section title="Imagen del producto">
+        {/* Duplicar no copia la imagen: la copia empieza sin foto. */}
+        <ProductImageField
+          productName={name.trim() || "el producto"}
+          currentPath={editing ? (source?.imagePath ?? null) : null}
+          error={fieldErrors.image}
+          pending={pending}
+        />
       </Section>
 
       <Section title="Clasificación" description="La categoría se obtiene de la subcategoría.">
@@ -371,5 +380,145 @@ function SelectField({ id, name, label, required = false, hint, error, placehold
         ))}
       </select>
     </Field>
+  );
+}
+
+// Imagen del producto: vista previa LOCAL (object URL, sin subir nada) y la
+// intención (keep | replace | remove) viaja con el formulario. La subida ocurre solo
+// al guardar el producto, en el servidor (sharp → Storage → image_path).
+function ProductImageField({ productName, currentPath, error, pending }: {
+  productName: string;
+  currentPath: string | null;
+  error?: string;
+  pending: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Libera el object URL al cambiar de vista previa o al cerrar el formulario.
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
+
+  const action: ImageAction = file ? "replace" : removed && currentPath ? "remove" : "keep";
+  const hasImage = Boolean(file) || (Boolean(currentPath) && !removed);
+  const message = localError ?? error;
+  const id = "producto-imagen";
+
+  function clearInput() {
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function onSelect(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0];
+    if (!selected) return;
+    const problem = validateImageFile(selected);
+    if (problem) {
+      setLocalError(problem);
+      clearInput();
+      return;
+    }
+    setLocalError(null);
+    setFile(selected);
+    setRemoved(false);
+    setPreview(URL.createObjectURL(selected));
+  }
+
+  function onRemove() {
+    setLocalError(null);
+    if (file) {
+      // Descarta la selección: vuelve a la imagen guardada (si hay).
+      setFile(null);
+      setPreview(null);
+      clearInput();
+    } else {
+      setRemoved(true);
+    }
+  }
+
+  const status = pending && action === "replace"
+    ? "Guardando imagen…"
+    : action === "replace"
+      ? "Imagen nueva: se guardará al guardar el producto."
+      : action === "remove"
+        ? "La imagen se eliminará al guardar el producto."
+        : currentPath
+          ? "Imagen actual."
+          : "Sin imagen: la tienda muestra un ícono genérico.";
+
+  return (
+    <div className="flex items-start gap-4">
+      <div className="relative size-24 shrink-0 overflow-hidden rounded-lg border bg-background-secondary">
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element -- vista previa local (blob:), next/image no aplica
+          <img src={preview} alt={`Vista previa de la nueva imagen de ${productName}`} className="size-full object-contain p-1" />
+        ) : (
+          <ProductImage
+            imagePath={removed ? null : currentPath}
+            alt={currentPath && !removed ? `Imagen actual de ${productName}` : ""}
+            variant="thumb"
+            className="size-24"
+          />
+        )}
+      </div>
+      <div className="min-w-0 flex-1 space-y-2">
+        <input
+          ref={inputRef}
+          id={id}
+          name="image"
+          type="file"
+          accept={IMAGE_ACCEPTED_TYPES.join(",")}
+          onChange={onSelect}
+          disabled={pending}
+          tabIndex={-1}
+          aria-describedby={`${id}-estado${message ? ` ${id}-error` : ""}`}
+          className="sr-only"
+        />
+        <input type="hidden" name="imageAction" value={action} />
+        <p id={`${id}-estado`} className="text-sm text-muted-foreground" aria-live="polite">
+          {status} <span className="text-subtle-foreground">JPG, PNG o WebP. Máximo 10 MB.</span>
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {hasImage ? (
+            <Button variant="secondary" onClick={() => inputRef.current?.click()} disabled={pending} aria-label={`Cambiar imagen de ${productName}`}>
+              <RefreshCw aria-hidden="true" />
+              Cambiar
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={() => inputRef.current?.click()} disabled={pending}>
+              <ImagePlus aria-hidden="true" />
+              Seleccionar imagen
+            </Button>
+          )}
+          {file ? (
+            <Button variant="ghost" onClick={onRemove} disabled={pending} aria-label={`Descartar la imagen nueva de ${productName}`}>
+              <Undo2 aria-hidden="true" />
+              Descartar
+            </Button>
+          ) : (
+            hasImage && (
+              <Button variant="ghost" onClick={onRemove} disabled={pending} aria-label={`Eliminar imagen de ${productName}`}>
+                <Trash2 aria-hidden="true" />
+                Eliminar
+              </Button>
+            )
+          )}
+          {removed && !file && (
+            <Button variant="ghost" onClick={() => setRemoved(false)} disabled={pending}>
+              <Undo2 aria-hidden="true" />
+              Deshacer
+            </Button>
+          )}
+        </div>
+        {message && (
+          <p id={`${id}-error`} role="alert" className="text-sm text-destructive-strong">
+            {message}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

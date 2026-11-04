@@ -6,6 +6,7 @@ import { slugify } from "@/lib/slug";
 import { Constants, type Database } from "@/types/database";
 
 import type { FieldErrors } from "./catalog-forms";
+import { parseImageIntent } from "./image-rules";
 
 // Validación del formulario de productos (Fase 8C.1). Pura: la usan la Server
 // Action (autoridad) y el cliente (solo UX). Precios y presentación viajan como
@@ -185,4 +186,16 @@ export function matchesProductSearch(
     [product.name, product.brandName ?? "", product.categoryName, product.subcategoryName].join(" "),
   );
   return words.every((word) => haystack.includes(word));
+}
+
+// Validación del navegador antes de enviar: producto + imagen (tipo y tamaño). El
+// servidor repite ambas y además decodifica la imagen.
+export function validateProductSubmission(formData: FormData):
+  | { ok: true }
+  | { ok: false; fieldErrors: FieldErrors; message: string } {
+  const product = parseProductForm(formData);
+  const image = parseImageIntent(formData);
+  if (product.ok && image.ok) return { ok: true };
+  const fieldErrors: FieldErrors = { ...(product.ok ? {} : product.fieldErrors), ...(image.ok ? {} : { image: image.message }) };
+  return { ok: false, fieldErrors, message: "Revisa los campos marcados." };
 }

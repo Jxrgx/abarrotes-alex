@@ -13,6 +13,7 @@ PostgreSQL en Supabase. El esquema se define solo con migraciones SQL en
 | `20261103000600_search_unaccent.sql` | Extensión `unaccent`, `private.search_normalize()` y columna generada `products.search_name` (búsqueda sin acentos, [catalog.md](catalog.md)) |
 | `20261103000700_admin_dashboard.sql` | `public.admin_dashboard()` (métricas del panel, `SECURITY INVOKER`, solo admin; [admin.md](admin.md)) |
 | `20261103000800_admin_save_product.sql` | `public.admin_save_product()`: alta/edición atómica de `products` + `branch_products` (`SECURITY INVOKER`, solo admin; [admin.md](admin.md)) |
+| `20261103000900_product_images_storage.sql` | Bucket público `product-images` (solo WebP, 2 MB) y políticas de escritura solo admin en `storage.objects` ([storage.md](storage.md)) |
 
 ```bash
 npx supabase start        # requiere Docker
@@ -242,13 +243,11 @@ porque Supabase otorga privilegios por defecto a `anon`.
 
 `service_role` ignora RLS: solo en servidor, nunca en variables `NEXT_PUBLIC_*`.
 
-## Storage (pendiente)
+## Storage
 
-No se creó ningún bucket. Propuesta para la fase de catálogo administrativo:
-bucket `product-images` público de lectura, escritura solo para admins mediante
-políticas en `storage.objects`. `products.image_path` guarda el object path y la
-URL se construye en el cliente (`supabase.storage.from('product-images').getPublicUrl(path)`).
-Se pospone porque sus políticas de escritura dependen de la definición de roles de Auth.
+Implementado en la Fase 8C.2: bucket público `product-images` (lectura pública por URL,
+escritura solo admin con `private.is_admin()`), paths versionados
+`products/{productId}/{uuid}.webp` en `products.image_path`. Ver [storage.md](storage.md).
 
 ## Autorización administrativa
 

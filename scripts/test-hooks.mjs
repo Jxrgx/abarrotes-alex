@@ -17,6 +17,8 @@ function withExtension(url) {
 }
 
 export async function resolve(specifier, context, nextResolve) {
+  // "server-only" lanza fuera de los Server Components de Next; en pruebas es un no-op.
+  if (specifier === "server-only") return { url: "data:text/javascript,export {};", shortCircuit: true };
   if (specifier.startsWith("@/")) {
     const target = withExtension(new URL(specifier.slice(2), SRC).href);
     if (target) return { url: target, shortCircuit: true };

@@ -22,7 +22,12 @@ export const SORT_ORDER_MAX = 9999;
 export type FieldErrors = Partial<Record<string, string>>;
 
 export type MutationResult =
-  | { ok: true; message: string }
+  | {
+      ok: true;
+      message: string;
+      /** Guardado parcial (p. ej. producto guardado pero la imagen no): se muestra como aviso. */
+      warning?: string;
+    }
   | {
       ok: false;
       message: string;

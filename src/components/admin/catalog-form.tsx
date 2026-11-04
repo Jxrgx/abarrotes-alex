@@ -17,7 +17,8 @@ export type FailedResult = Extract<MutationResult, { ok: false }>;
 type CatalogFormDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSaved: (message: string) => void;
+  /** warning: guardado parcial (p. ej. el producto sí, la imagen no). */
+  onSaved: (message: string, warning?: string) => void;
   title: string;
   description?: ReactNode;
   submitLabel: string;
@@ -28,7 +29,7 @@ type CatalogFormDialogProps = {
   /** "lg" para formularios con secciones (productos). */
   size?: "md" | "lg";
   hidden?: Record<string, string>;
-  children: (state: { fieldErrors: FieldErrors; result: FailedResult | null }) => ReactNode;
+  children: (state: { fieldErrors: FieldErrors; result: FailedResult | null; pending: boolean }) => ReactNode;
 };
 
 // Formulario de alta/edición en diálogo (patrón CRUD del panel):
@@ -69,7 +70,7 @@ export function CatalogFormDialog({ open, onClose, onSaved, title, description, 
           // de inmediato precargaba valores viejos.
           startTransition(() => {
             setResult(null);
-            onSaved(response.message);
+            onSaved(response.message, response.warning);
           });
           return;
         }
@@ -96,7 +97,7 @@ export function CatalogFormDialog({ open, onClose, onSaved, title, description, 
               {banner}
             </p>
           )}
-          {children({ fieldErrors, result })}
+          {children({ fieldErrors, result, pending })}
         </DialogBody>
         <DialogFooter>
           <Button variant="secondary" onClick={close} disabled={pending}>

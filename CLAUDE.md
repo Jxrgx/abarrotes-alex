@@ -9,6 +9,7 @@
 - Checkout, confirmación y WhatsApp: [docs/checkout.md](docs/checkout.md)
 - Autenticación y autorización del panel (`/admin`, roles, RLS): [docs/auth.md](docs/auth.md)
 - Panel administrativo (navegación, dashboard, métricas, zona horaria): [docs/admin.md](docs/admin.md)
+- Imágenes de producto (Storage, bucket, paths, procesamiento con sharp): [docs/storage.md](docs/storage.md)
 - Pruebas unitarias: `npm test` (node --test, archivos `*.test.ts`)
 - Supabase: datos públicos con `getPublicSupabase()` (sin cookies, anon); Auth y datos
   de sesión con `createClient()` de `lib/supabase/server.ts`. Ver docs/database.md.

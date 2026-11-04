@@ -8,6 +8,9 @@ import { slugify } from "@/lib/slug";
 import { createClient } from "@/lib/supabase/server";
 
 import type { MutationResult } from "./catalog-forms";
+import { parseImageIntent } from "./image-rules";
+import { type ProcessedImage, processProductImage } from "./product-image";
+import { removeProductImage, replaceProductImage } from "./product-image-storage";
 import { parseProductForm, productMutationError } from "./product-forms";
 
 // Mutaciones de productos (Fase 8C.1). Igual que en 8B: requireAdmin() →
@@ -43,8 +46,19 @@ export async function saveProduct(formData: FormData): Promise<MutationResult> {
   if (!parsed.ok) return parsed;
   const input = parsed.data;
 
+  // Imagen: se valida y PROCESA antes de guardar nada. Un archivo inválido no deja
+  // ni producto ni objeto en Storage.
+  const intent = parseImageIntent(formData);
+  if (!intent.ok) return { ok: false, message: "Revisa los campos marcados.", fieldErrors: { image: intent.message } };
+  let processed: ProcessedImage | null = null;
+  if (intent.action === "replace" && intent.file) {
+    const result = await processProductImage(intent.file);
+    if (!result.ok) return { ok: false, message: "Revisa los campos marcados.", fieldErrors: { image: result.message } };
+    processed = result.image;
+  }
+
   const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_save_product", {
+  const { data: productId, error } = await supabase.rpc("admin_save_product", {
     p_product_id: nullable(input.id ?? null),
     p_name: input.name,
     p_slug: slugify(input.name),
@@ -65,10 +79,21 @@ export async function saveProduct(formData: FormData): Promise<MutationResult> {
   });
   if (error) return failure(error.code);
 
+  // Producto + precios ya están guardados (transacción propia). La imagen va después
+  // y por separado: si falla, NO se revierte el producto; se informa al admin.
+  let warning: string | undefined;
+  if (processed) {
+    const outcome = await replaceProductImage(supabase, productId, processed);
+    if (!outcome.ok) warning = `El producto se guardó, pero la imagen no. ${outcome.message}`;
+  } else if (intent.action === "remove" && input.id) {
+    const outcome = await removeProductImage(supabase, productId);
+    if (!outcome.ok) warning = `El producto se guardó, pero la imagen no se eliminó. ${outcome.message}`;
+  }
+
   revalidateProducts();
   const mode = formData.get("mode");
   const message = input.id ? "Producto actualizado" : mode === "duplicate" ? "Producto duplicado" : "Producto creado";
-  return { ok: true, message };
+  return { ok: true, message, warning };
 }
 
 const idSchema = z.uuid();

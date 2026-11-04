@@ -129,11 +129,11 @@ Pendiente para la Fase 8: validar transiciones de estado (p. ej. no volver de
 Para quitar acceso: `delete from public.profiles where id = '<uuid>';` o cambiar el
 rol desde el SQL Editor. Las credenciales nunca se guardan en el repositorio.
 
-## Storage (decisión futura)
+## Storage
 
-`is_admin()` permitirá las políticas del bucket `product-images`: lectura pública y
-escritura (`insert/update/delete` en `storage.objects`) solo con
-`bucket_id = 'product-images' and (select private.is_admin())`. El bucket aún no se crea.
+Implementado en la Fase 8C.2 con la misma autoridad: el bucket `product-images` es de
+lectura pública y solo `private.is_admin()` puede subir, reemplazar o borrar objetos
+(políticas en `storage.objects`). Ver [storage.md](storage.md).
 
 ## Pruebas
 

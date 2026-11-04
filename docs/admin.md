@@ -417,9 +417,19 @@ Corrigió tres bugs:
 
 Además se eliminó la regla "por peso → g o kg" (no forma parte del dominio).
 
-## Próximas fases
+## Imágenes de producto (Fase 8C.2)
 
-- 8C.2: imágenes de producto (Storage, bucket `product-images`).
+Sección **Imagen del producto** del formulario: miniatura (actual o vista previa local),
+"Seleccionar imagen" / "Cambiar" / "Eliminar" (o "Descartar" una selección nueva,
+"Deshacer" una eliminación) y el requisito "JPG, PNG o WebP. Máximo 10 MB.". Nada se sube
+al seleccionar: el archivo viaja con el formulario y se procesa al **guardar el producto**
+(`imageAction` = keep | replace | remove). Errores amigables: "El archivo es demasiado
+grande.", "Usa una imagen JPG, PNG o WebP.", "No pudimos procesar la imagen.", "No pudimos
+guardar la imagen. Intenta de nuevo.". Si el producto se guarda pero la imagen no, el aviso
+lo dice explícitamente. Duplicar no copia la imagen. Las miniaturas del listado usan la
+foto real. Detalles de bucket, seguridad, paths y compensación: [storage.md](storage.md).
+
+## Próximas fases
 - Promociones y sucursales (reutilizando el patrón anterior).
 - 8E: lista y detalle de pedidos, cambio de estado (con validación de transiciones).
 - Selector de sucursal cuando exista más de una (`getAdminBranch(preferredId)` ya lo admite).
