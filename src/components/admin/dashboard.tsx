@@ -1,4 +1,4 @@
-import { AlertCircle, Banknote, ChevronRight, ClipboardList, Clock, type LucideIcon, Receipt, Store } from "lucide-react";
+import { Banknote, ChevronRight, ClipboardList, Clock, type LucideIcon, Receipt, Store } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -7,6 +7,7 @@ import { formatBusinessDateTime } from "@/lib/datetime";
 import { formatCents } from "@/lib/format";
 import { DELIVERY_TYPE_LABELS } from "@/lib/orders/status";
 
+import { AdminLoadError } from "./admin-list";
 import { OrderStatusBadge } from "./order-status-badge";
 
 // Resumen del día. Presentacional: los datos llegan ya calculados por la base.
@@ -201,19 +202,5 @@ export function DashboardSkeleton() {
 }
 
 export function DashboardError() {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border bg-card p-5">
-      <p className="flex items-center gap-2 font-medium">
-        <AlertCircle className="size-5 text-destructive-strong" aria-hidden="true" />
-        No pudimos cargar el resumen.
-      </p>
-      <p className="text-sm text-muted-foreground">Tu sesión sigue activa. Vuelve a intentarlo en unos momentos.</p>
-      <Link
-        href="/admin"
-        className="inline-flex h-10 items-center rounded-lg border border-input bg-background px-4 text-sm font-medium hover:bg-accent"
-      >
-        Reintentar
-      </Link>
-    </div>
-  );
+  return <AdminLoadError title="No pudimos cargar el resumen." retryHref="/admin" />;
 }

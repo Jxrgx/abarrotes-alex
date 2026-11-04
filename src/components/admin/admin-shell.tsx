@@ -6,6 +6,7 @@ import { type AdminContext, ROLE_LABELS } from "@/lib/auth/session";
 import { AdminNavList } from "./admin-nav";
 import { MobileAdminNav } from "./mobile-admin-nav";
 import { SignOutButton } from "./sign-out-button";
+import { ToastProvider } from "./toast";
 
 // Estructura del panel: barra lateral en desktop (lg+) y barra superior con
 // botón "Menú" en móvil/tablet. La navegación viene de src/lib/admin/navigation.ts.
@@ -53,7 +54,7 @@ export function AdminShell({ context, children }: { context: AdminContext; child
         </header>
 
         <main id="contenido" className="flex-1 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-          {children}
+          <ToastProvider>{children}</ToastProvider>
         </main>
       </div>
     </div>

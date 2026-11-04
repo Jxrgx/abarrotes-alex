@@ -545,6 +545,22 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_save_product: {
+        Args: {
+          p_branches: Json
+          p_brand_id: string
+          p_is_active: boolean
+          p_is_featured: boolean
+          p_name: string
+          p_presentation: number
+          p_product_id: string
+          p_sale_type: Database["public"]["Enums"]["sale_type"]
+          p_slug: string
+          p_subcategory_id: string
+          p_unit: Database["public"]["Enums"]["product_unit"]
+        }
+        Returns: string
+      }
       create_order: {
         Args: {
           p_address?: string

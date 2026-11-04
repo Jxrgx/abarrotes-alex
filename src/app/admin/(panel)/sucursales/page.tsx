@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 
-import { ModulePlaceholder } from "@/components/admin/module-placeholder";
-import { requireAdmin } from "@/lib/auth/session";
+import { AdminGuard } from "@/components/admin/admin-guard";
+import { ModulePlaceholder, ModulePlaceholderSkeleton } from "@/components/admin/module-placeholder";
 
 export const metadata: Metadata = { title: "Sucursales" };
 
-export default async function Page() {
-  await requireAdmin();
-  return <ModulePlaceholder title="Sucursales" description="Aquí podrás editar los datos y horarios de la sucursal." />;
+export default function Page() {
+  return (
+    <AdminGuard fallback={<ModulePlaceholderSkeleton title="Sucursales" />}>
+      <ModulePlaceholder title="Sucursales" description="Aquí podrás editar los datos y horarios de la sucursal." />
+    </AdminGuard>
+  );
 }
