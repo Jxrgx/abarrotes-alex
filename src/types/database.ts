@@ -292,6 +292,7 @@ export type Database = {
           client_request_id: string | null
           created_at: string
           customer_name: string
+          customer_name_search: string | null
           customer_notes: string | null
           customer_phone: string
           delivery_type: Database["public"]["Enums"]["delivery_type"]
@@ -313,6 +314,7 @@ export type Database = {
           client_request_id?: string | null
           created_at?: string
           customer_name: string
+          customer_name_search?: string | null
           customer_notes?: string | null
           customer_phone: string
           delivery_type: Database["public"]["Enums"]["delivery_type"]
@@ -334,6 +336,7 @@ export type Database = {
           client_request_id?: string | null
           created_at?: string
           customer_name?: string
+          customer_name_search?: string | null
           customer_notes?: string | null
           customer_phone?: string
           delivery_type?: Database["public"]["Enums"]["delivery_type"]
@@ -580,6 +583,14 @@ export type Database = {
         Returns: Json
       }
       next_order_folio: { Args: never; Returns: string }
+      update_order_status: {
+        Args: {
+          p_expected_status: Database["public"]["Enums"]["order_status"]
+          p_new_status: Database["public"]["Enums"]["order_status"]
+          p_order_id: string
+        }
+        Returns: Database["public"]["Enums"]["order_status"]
+      }
     }
     Enums: {
       delivery_type: "delivery" | "pickup"

@@ -181,3 +181,65 @@ Implementado en la Fase 6B: ver [checkout.md](checkout.md).
 - Remoto: prueba dentro de un bloque `DO` que se revierte, y E2E de `POST /api/pedidos`
   con pedidos de prueba que se borraron explícitamente; la sequence se reinició porque
   no quedaba ningún pedido.
+
+## Estados y operación en el panel (Fase 8E)
+
+### Máquina de estados
+
+```
+delivery: new → confirmed → preparing → ready → on_the_way       → delivered
+pickup:   new → confirmed → preparing → ready → ready_for_pickup → delivered
+cancelled: desde cualquier estado NO final
+```
+
+- **Sin saltos** (`new → delivered`, `new → preparing` fallan) y **sin cruzar ramas**
+  (`ready → ready_for_pickup` en domicilio o `ready → on_the_way` en recoger fallan).
+- **Finales**: `delivered` y `cancelled` no salen a ningún otro estado (no se puede
+  cancelar un pedido entregado ni reactivar uno cancelado).
+- Definición única en `private.order_status_transition_allowed(entrega, desde, hacia)`
+  (migración `…001100`). `src/lib/orders/status.ts` (`nextOrderStatus`, `canTransition`)
+  es un espejo para la UI; `tests/integration/order-status.test.mjs` compara ambos en las
+  128 combinaciones.
+
+### Autoridad en la base
+
+1. **Trigger `validate_status_transition`** (`BEFORE UPDATE OF status`): valida toda
+   actualización de estado, venga de la función o de un `UPDATE` directo por la API (el
+   admin conserva el privilegio por columna `update (status)` de la Fase 7). Error `ORD02`.
+2. **`public.update_order_status(p_order_id, p_expected_status, p_new_status)`**: la
+   operación del panel. `SECURITY INVOKER` (RLS y privilegios del admin), rechaza a quien
+   no es admin (`42501`), bloquea la fila (`FOR UPDATE`), y:
+   - `P0002` si el pedido no existe (o no es visible);
+   - **`ORD01` si el estado actual no es el esperado** (concurrencia: otro admin lo cambió
+     mientras se revisaba; no se sobrescribe). El panel responde "El pedido cambió mientras
+     lo estabas revisando. Actualizamos la información." y recarga los datos;
+   - `ORD02` si la transición no es válida.
+3. **Historial**: lo escribe el trigger existente `log_status_change` (Fase 7) en la misma
+   transacción, con `changed_by = auth.uid()`. La función no inserta historial (sin
+   duplicados). El estado inicial de `create_order` sigue con `changed_by = NULL` ("Sistema").
+
+Importes, partidas y folio **no se editan** (sin privilegios de `UPDATE` sobre esas
+columnas ni sobre `order_items`): el pedido es un snapshot histórico.
+
+### Pruebas
+
+- PGlite (`npm run test:db`): flujos completos delivery y pickup, inválidos, cancelación
+  desde cada estado permitido, finales, concurrencia (A confirma; B con estado viejo → `ORD01`),
+  inexistente, seguridad por rol, `UPDATE` directo validado y sin historial duplicado.
+- Remoto: mismas reglas en una transacción revertida, con pedidos sintéticos (sin dejar pedidos).
+- E2E de mutación (`npm run test:e2e:order-lifecycle -- --crear-pedido`, autorizado una vez):
+  creó **ALEX-000003** ("__E2E__ Cliente estados", datos sintéticos, domicilio) por la tienda y
+  lo llevó por la UI de Nuevo a Entregado. Tras cada transición: estado, historial +1 sin
+  duplicados, hora de Mérida, siguiente acción, refresh, listado y dashboard. Queda como
+  pedido de desarrollo (Entregado); no se borró ni se reinició la sequence.
+
+### Búsqueda de pedidos sin acentos (migración `…001200`)
+
+`orders.customer_name_search` es una columna **generada** con
+`private.order_search_normalize(customer_name)`: `lower()` + `translate()` de las vocales
+con acento o diéresis (á à â ä é … ü, también en mayúsculas). **Conserva la ñ** (y convierte
+Ñ → ñ). `create_order` no cambió: la columna se calcula sola.
+
+No se reutilizó `private.search_normalize` del catálogo porque el diccionario de `unaccent`
+también convierte **ñ → n** (verificado en Supabase: "Peña" → "pena"). En el catálogo eso se
+mantiene (buscar "pena" encuentra "peña"); en pedidos, "Peña" y "Pena" son nombres distintos.

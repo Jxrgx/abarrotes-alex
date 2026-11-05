@@ -86,8 +86,8 @@ select exists (select 1 from public.profiles
 Las políticas públicas de lectura del catálogo (activos) no cambian. `create_order`
 no se modificó.
 
-Pendiente para la Fase 8: validar transiciones de estado (p. ej. no volver de
-`delivered` a `new`), idealmente con una función `update_order_status`.
+Transiciones de estado: implementadas en la Fase 8E con `public.update_order_status` y un
+trigger de validación ([orders.md](orders.md)).
 
 ## Login y logout
 

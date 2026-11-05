@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Capturas de las pruebas E2E (pueden contener datos de clientes)
+tests/e2e/.artifacts/

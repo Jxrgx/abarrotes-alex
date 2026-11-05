@@ -14,6 +14,9 @@ PostgreSQL en Supabase. El esquema se define solo con migraciones SQL en
 | `20261103000700_admin_dashboard.sql` | `public.admin_dashboard()` (métricas del panel, `SECURITY INVOKER`, solo admin; [admin.md](admin.md)) |
 | `20261103000800_admin_save_product.sql` | `public.admin_save_product()`: alta/edición atómica de `products` + `branch_products` (`SECURITY INVOKER`, solo admin; [admin.md](admin.md)) |
 | `20261103000900_product_images_storage.sql` | Bucket público `product-images` (solo WebP, 2 MB) y políticas de escritura solo admin en `storage.objects` ([storage.md](storage.md)) |
+| `20261103001000_promotions_integrity.sql` | Extensión `btree_gist`, exclusion constraint `promotions_no_overlap` y trigger `private.validate_promotion` (precio < normal, producto fijo) ([promotions.md](promotions.md)) |
+| `20261103001100_order_status_transitions.sql` | Máquina de estados de pedidos: `private.order_status_transition_allowed`, trigger `validate_status_transition` y `public.update_order_status` (concurrencia con estado esperado) ([orders.md](orders.md)) |
+| `20261103001200_order_search.sql` | `private.order_search_normalize` y columna generada `orders.customer_name_search` (búsqueda de pedidos sin acentos, conservando la ñ; [orders.md](orders.md)) |
 
 ```bash
 npx supabase start        # requiere Docker
@@ -257,6 +260,6 @@ sin escritura vía API y registro automático de cambios de estado. Ver [auth.md
 Pendiente:
 
 - Decidir si `employee` se restringe a una sucursal (requeriría relacionar profiles con branches).
-- Validar transiciones de estado de pedidos (Fase 8).
-- Opcional: impedir promociones activas traslapadas para un mismo `branch_product`
-  (hoy la aplicación debe elegir una) y validar `promotional_price < price`.
+- ~~Validar transiciones de estado de pedidos~~: implementado en la Fase 8E ([orders.md](orders.md)).
+- ~~Impedir promociones activas traslapadas y validar `promotional_price < price`~~:
+  implementado en la Fase 8D ([promotions.md](promotions.md)).

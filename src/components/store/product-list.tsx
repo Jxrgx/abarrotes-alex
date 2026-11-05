@@ -29,9 +29,12 @@ export function ProductRail({ products, headingLevel }: ProductListProps) {
   return (
     <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:snap-none md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-4 xl:grid-cols-5">
       {products.map((product) => (
+        // relative: los elementos absolutos de la tarjeta (p. ej. el texto sr-only
+        // "Precio anterior") quedan dentro del carrusel y su overflow los recorta; sin
+        // esto se ubicaban respecto a la página y causaban scroll horizontal en móvil.
         <li
           key={product.id}
-          className="w-[calc((100%-0.75rem)/2.2)] shrink-0 snap-start md:w-auto"
+          className="relative w-[calc((100%-0.75rem)/2.2)] shrink-0 snap-start md:w-auto"
         >
           <ProductCard product={product} headingLevel={headingLevel} />
         </li>

@@ -43,7 +43,9 @@ Todos se combinan (intersección). La lógica pura vive en
 - **Sin acentos** (Fase 4C): el nombre se busca en `products.search_name`, columna
   generada con `unaccent` + minúsculas (migración `…000600`); el término se normaliza
   igual en la aplicación (`normalizeSearchText`: NFD sin diacríticos + minúsculas).
-  `jabon`, `JABÓN` y `jabón` encuentran "Jabón". Marcas, subcategorías y categorías se
+  `jabon`, `JABÓN` y `jabón` encuentran "Jabón". Nota: el diccionario de `unaccent`
+  también convierte **ñ → n**, así que en el catálogo `pena` encuentra "Peña" (aceptable
+  para buscar productos). La búsqueda de pedidos del panel sí distingue la ñ (ver orders.md). Marcas, subcategorías y categorías se
   comparan con la misma normalización en el servidor (sus ids van en el `or`).
 - El texto se normaliza (NFC) y solo conserva letras, números, espacios, `-`, `.` y `'`;
   así no llegan caracteres con significado en los filtros de PostgREST.

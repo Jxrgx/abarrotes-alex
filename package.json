@@ -9,7 +9,13 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "check:supabase": "node --env-file=.env.local scripts/check-supabase.mjs",
-    "test": "node --import ./scripts/register-test-hooks.mjs --test \"src/**/*.test.ts\""
+    "test": "node --import ./scripts/register-test-hooks.mjs --test \"src/**/*.test.ts\"",
+    "test:db": "node --import ./scripts/register-test-hooks.mjs --test \"tests/integration/*.test.mjs\"",
+    "test:e2e": "node --env-file=.env.local tests/e2e/regression.mjs",
+    "test:e2e:orders": "node --env-file=.env.local tests/e2e/orders.mjs",
+    "test:e2e:promotions": "node --env-file=.env.local tests/e2e/promotions.mjs",
+    "test:e2e:cleanup": "node --env-file=.env.local tests/e2e/cleanup-promotions.mjs",
+    "test:e2e:order-lifecycle": "node --env-file=.env.local tests/e2e/order-lifecycle.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -30,12 +36,14 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.4",
+    "puppeteer-core": "^24.43.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

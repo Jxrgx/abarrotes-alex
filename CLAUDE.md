@@ -10,7 +10,10 @@
 - Autenticación y autorización del panel (`/admin`, roles, RLS): [docs/auth.md](docs/auth.md)
 - Panel administrativo (navegación, dashboard, métricas, zona horaria): [docs/admin.md](docs/admin.md)
 - Imágenes de producto (Storage, bucket, paths, procesamiento con sharp): [docs/storage.md](docs/storage.md)
-- Pruebas unitarias: `npm test` (node --test, archivos `*.test.ts`)
+- Promociones (semántica de vigencia, solapamiento, estados, zona horaria): [docs/promotions.md](docs/promotions.md)
+- Pruebas: `npm test` (unitarias), `npm run test:db` (PGlite: migraciones, RLS, estados de
+  pedidos, promociones) y `npm run test:e2e*` (navegador con sesión real). Ver
+  [tests/README.md](tests/README.md). Solo datos sintéticos en pruebas versionadas.
 - Supabase: datos públicos con `getPublicSupabase()` (sin cookies, anon); Auth y datos
   de sesión con `createClient()` de `lib/supabase/server.ts`. Ver docs/database.md.
 

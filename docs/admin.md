@@ -25,10 +25,10 @@ Definida una sola vez en `src/lib/admin/navigation.ts` (sidebar y menú móvil):
 | Grupo | Módulo | Ruta | Estado |
 | --- | --- | --- | --- |
 | — | Inicio | `/admin` | Dashboard (Fase 8A) |
-| — | Pedidos | `/admin/pedidos`, `/admin/pedidos/[id]` | En construcción |
+| — | Pedidos | `/admin/pedidos`, `/admin/pedidos/[id]` | Listado, detalle y estados (Fase 8E) |
 | — | Productos | `/admin/productos` | CRUD + precio por sucursal (Fase 8C.1) |
 | Catálogo | Categorías · Subcategorías · Marcas | `/admin/categorias` … | CRUD (Fase 8B) |
-| — | Promociones | `/admin/promociones` | En construcción |
+| — | Promociones | `/admin/promociones` | Precio promocional (Fase 8D) |
 | — | Sucursales | `/admin/sucursales` | En construcción |
 
 - Activo: `isAdminNavActive()` — Inicio solo exactamente en `/admin`; cada módulo
@@ -428,6 +428,76 @@ grande.", "Usa una imagen JPG, PNG o WebP.", "No pudimos procesar la imagen.", "
 guardar la imagen. Intenta de nuevo.". Si el producto se guarda pero la imagen no, el aviso
 lo dice explícitamente. Duplicar no copia la imagen. Las miniaturas del listado usan la
 foto real. Detalles de bucket, seguridad, paths y compensación: [storage.md](storage.md).
+
+## Promociones (Fase 8D)
+
+`/admin/promociones` reutiliza el patrón CRUD (`AdminGuard` → `loadAdminSection` →
+`PromotionManager`; `CatalogFormDialog` grande; `useActiveToggle`; `RowActions`).
+Archivos: `src/lib/admin/promotions.ts` (consulta), `promotion-actions.ts` (Server
+Actions), `promotion-forms.ts` (estados, validación y errores; probado),
+`components/admin/promotion-manager.tsx` y `promotion-form.tsx` (buscador de productos).
+Semántica, estados, zona horaria y reglas de la base: [promotions.md](promotions.md).
+
+## Pedidos (Fase 8E)
+
+Responde "¿qué pedidos tengo que atender y qué hago con cada uno?". No es un CRM.
+
+### Listado `/admin/pedidos`
+
+- Más recientes primero. Tabla en desktop (folio, cliente, entrega, total con "+ envío" si
+  está por confirmar, estado, fecha, "Ver pedido"); tarjetas enlazadas en móvil. Sin
+  dirección en el listado.
+- **Filtros en la URL** (fuente de verdad: refresh, atrás/adelante, enlaces):
+  `?estado=new|…|pendientes&entrega=delivery|pickup&periodo=hoy|7d|30d|todos&q=…&page=N`.
+  Formulario `GET` normal; los selects se envían al cambiar. Valores inválidos se ignoran.
+- **Búsqueda** por folio, nombre o teléfono, en el servidor (sin Fuse; los datos nunca van
+  a la tienda). El texto se sanea a letras, números, espacios y guion.
+  - **Nombre sin acentos ni mayúsculas, conservando la ñ**: "Maria" → "María", "ANGEL" →
+    "Ángel", "Martin" → "Martín"; pero "Pena" **no** encuentra "Peña" (en español son letras
+    distintas). Se compara contra la columna generada `orders.customer_name_search`
+    (`private.order_search_normalize`, migración `…001200`) con el mismo algoritmo en
+    TypeScript (`normalizeOrderSearch`).
+  - **Folio** sin importar mayúsculas. **Teléfono** por dígitos (acepta espacios), solo si el
+    texto no tiene letras: así buscar "ALEX-000123" no trae pedidos cuyo teléfono contenga "000123".
+  - Se combina con filtros y paginación (todo en la misma consulta).
+- **Periodos** en el día de negocio de Mérida (`periodStart`, `src/lib/admin/order-filters.ts`).
+- **Paginación en el servidor**: 25 por página (`range` + `count: exact` de PostgREST);
+  solo esa página viaja al navegador. Página fuera de rango → lista vacía.
+- Vacío: "Aún no hay pedidos."; con filtros: "No encontramos pedidos con estos filtros." +
+  "Limpiar filtros".
+
+### Detalle `/admin/pedidos/[id]`
+
+- Arriba (lo operativo): folio, estado, tipo de entrega, cliente, fecha y sucursal, y las
+  acciones. En móvil, además, **barra inferior fija** con la acción siguiente y "Cancelar"
+  (respeta `safe-area`; el contenido tiene padding para no quedar tapado).
+- Cliente (teléfono legible, enlace `tel:` y "Escribir al cliente por WhatsApp": abre
+  `wa.me` del **cliente**, sin mensaje predefinido; no es el WhatsApp de la sucursal),
+  entrega (dirección como texto, sin mapas), pago ("Efectivo", "Paga con", "Cambio
+  aproximado" sobre el total conocido y aviso si el envío está por confirmar), productos
+  del **snapshot** de `order_items`, resumen (envío NULL = "Por confirmar", "Total sin
+  envío"), notas e historial.
+- **Historial**: lista cronológica (`<ol>`) con estado, fecha/hora de Mérida y quién:
+  "Sistema" (`changed_by` NULL), "Tú (nombre)" o "Otro administrador" (la RLS de
+  `profiles` solo deja leer el propio perfil; nunca se muestra un UUID).
+- Id inválido o pedido inexistente → `notFound()` (misma respuesta para no revelar nada).
+
+### Cambiar estado
+
+- Solo se ofrece la transición siguiente válida ("Confirmar pedido", "Empezar a preparar",
+  "Marcar listo", "Enviar (en camino)" / "Listo para recoger", "Marcar entregado") y
+  "Cancelar pedido" (confirmación: "¿Cancelar el pedido ALEX-…? El pedido quedará como
+  cancelado y no podrá reactivarse."). Estados finales: "Estado final: ya no se puede cambiar."
+- Server Action `changeOrderStatus` → `update_order_status` con el **estado esperado**
+  (ver [orders.md](orders.md)). Revalida `/admin` (dashboard), `/admin/pedidos` y el detalle.
+- Avisos: "Pedido confirmado", "Pedido en preparación", "Pedido listo", "Pedido en camino",
+  "Pedido listo para recoger", "Pedido entregado", "Pedido cancelado".
+
+### Privacidad
+
+Nombre, teléfono, dirección y notas son datos personales: solo el admin los lee (RLS), no
+se registran en logs (solo códigos de error), no van a la tienda ni a pruebas versionadas
+(datos sintéticos), y las capturas E2E quedan en una carpeta ignorada por git.
 
 ## Próximas fases
 - Promociones y sucursales (reutilizando el patrón anterior).
