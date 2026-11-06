@@ -21,6 +21,8 @@ export async function proxy(request: NextRequest) {
 
   // Páginas administrativas: nunca en caché (tampoco al volver con "Atrás").
   result.headers.set("Cache-Control", "private, no-store");
+  // Nunca indexar el panel (también redirecciones y respuestas que no son HTML).
+  result.headers.set("X-Robots-Tag", "noindex, nofollow");
   return result;
 }
 

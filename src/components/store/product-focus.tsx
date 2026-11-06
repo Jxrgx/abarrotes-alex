@@ -11,7 +11,7 @@ export function ProductFocus({ productId }: { productId: string }) {
   useEffect(() => {
     // productId ya está validado como UUID en el servidor (seguro como selector).
     const card = document.querySelector<HTMLElement>(`article[data-product-id="${productId}"]`);
-    if (!card || !card.checkVisibility()) return;
+    if (!card || !isVisible(card)) return;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     card.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
@@ -30,4 +30,10 @@ export function ProductFocus({ productId }: { productId: string }) {
   }, [productId]);
 
   return null;
+}
+
+// checkVisibility() no existe antes de Safari 17.4 (iOS 16.4–17.3): sin él, la tarjeta se
+// considera visible si tiene cajas de layout (no está dentro de un display:none).
+function isVisible(element: HTMLElement) {
+  return typeof element.checkVisibility === "function" ? element.checkVisibility() : element.getClientRects().length > 0;
 }

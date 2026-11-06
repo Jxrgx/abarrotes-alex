@@ -106,10 +106,13 @@ export function ListSkeleton({ label, filters = 0 }: { label: string; filters?: 
   );
 }
 
-// Tabla compacta (md+). Columnas explícitas en cada módulo: sin configuración dinámica.
+// Tabla compacta (lg+). Columnas explícitas en cada módulo: sin configuración dinámica.
+// Con la barra lateral, a 1024–1280 px el área útil puede ser menor que la tabla: se desplaza
+// horizontalmente (overflow-x-auto) en lugar de recortar las columnas de acciones.
+// `relative`: contiene los sr-only (absolutos) para que no ensanchen el documento.
 export function AdminTable({ caption, head, children }: { caption: string; head: ReactNode; children: ReactNode }) {
   return (
-    <div className="hidden overflow-hidden rounded-xl border bg-card md:block">
+    <div className="relative hidden overflow-x-auto rounded-xl border bg-card lg:block">
       <table className="w-full text-left text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="border-b bg-background-secondary text-xs text-muted-foreground">
@@ -121,10 +124,10 @@ export function AdminTable({ caption, head, children }: { caption: string; head:
   );
 }
 
-// Lista de tarjetas (móvil): sin tabla comprimida ni scroll horizontal.
+// Lista de tarjetas (móvil y tablet): sin tabla comprimida ni scroll horizontal.
 export function AdminCardList({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <ul aria-label={label} className="divide-y divide-border-subtle overflow-hidden rounded-xl border bg-card md:hidden">
+    <ul aria-label={label} className="divide-y divide-border-subtle overflow-hidden rounded-xl border bg-card lg:hidden">
       {children}
     </ul>
   );

@@ -1,0 +1,493 @@
+# Preparación de producción (Fase 9C)
+
+Inventario del entorno actual, datos pendientes del cliente, plan de limpieza y checklist de
+lanzamiento. **9C.1 es solo auditoría y planificación**: nada de lo descrito aquí se ha
+ejecutado. Sin secretos ni datos personales: los conteos y estados se obtuvieron con
+consultas de solo lectura (`supabase db query --remote --read-only`) el 2026-11-05.
+
+Decisiones vigentes: multisucursal fuera del MVP; `create_order` pública, sin rate limiting
+ni CAPTCHA (riesgos aceptados, ver [security.md](security.md) §0).
+
+### Estado de datos del negocio (actualizado en 9C.2, 2026-11-05)
+
+| Dato | Estado |
+| --- | --- |
+| Nombre comercial | **Confirmado**: Abarrotes Alex (sucursal: "Abarrotes Alex - Concepción Durán") |
+| Dirección | **Confirmada** y aplicada en la base |
+| Teléfono público | **Confirmado** (984 471 0604) y aplicado |
+| WhatsApp de pedidos | **Confirmado** (+52 1 982 104 1154 → `529821041154`) y aplicado |
+| Logo | **Confirmado**: logo real integrado (§17) |
+| Horarios | **Temporalmente conservados** (los del seed); pendiente confirmación final |
+| Dominio | Pendiente |
+| Catálogo | Pendiente (carga y limpieza en una fase posterior; se esperan +1,000 productos) |
+| Hosting | Candidato actual: Vercel |
+
+---
+
+## 1. Inventario actual (Supabase remoto)
+
+| Tabla | Filas | Detalle |
+| --- | --- | --- |
+| `branches` | 1 | Mismo id fijo del seed. Desde 9C.2 con nombre, dirección, teléfono y WhatsApp **reales** (coordenadas del seed puestas en `NULL`). Activa |
+| `branch_hours` | 7 | Horario del seed: L–S 08:00–21:00, D 09:00–15:00 |
+| `categories` | 6 | 5 del seed (activas) + 1 `__E2E__` (inactiva) |
+| `subcategories` | 13 | 11 del seed + 1 `__E2E__` + 1 **«Galletas» bajo Botanas** (ver §2) — las 2 últimas inactivas |
+| `brands` | 8 | 7 del seed (ficticias) + 1 `__E2E__` (inactiva) |
+| `products` | 13 | 12 del seed + 1 `__E2E__` (inactivo). **Ninguno tiene imagen** |
+| `branch_products` | 13 | Precios del seed; 11 disponibles (agotados: «Jugo de mango» del seed y el `__E2E__`) |
+| `promotions` | 2 | Ambas del seed: Refresco de cola 600 ml (sin fechas) y Detergente (vence 2026-12-03) |
+| `orders` | 3 | ALEX-000001, -000002, -000003 (ver §3) |
+| `order_items` | 8 | Solo de esos 3 pedidos |
+| `order_status_history` | 8 | 1 + 1 + 6 |
+| `profiles` | 1 | 1 admin (cuenta de **desarrollo**) |
+| `auth.users` | 1 | La misma cuenta |
+| `storage.objects` (`product-images`) | 0 | Bucket configurado: público, solo `image/webp`, 2 MB |
+
+Las 12 migraciones (`…000100` a `…001200`) están aplicadas y registradas.
+
+## 2. Datos `__E2E__` y otros datos de prueba
+
+| Tipo | Nombre identificable | Estado | Relaciones |
+| --- | --- | --- | --- |
+| Categoría | `__E2E__ Categoria e2e-pmwfp editada` | inactiva | 1 subcategoría (la E2E) |
+| Subcategoría | `__E2E__ Subcategoria e2e-pmwfp editada` | inactiva | 1 producto (el E2E) |
+| Marca | `__E2E__ Marca e2e-pmwfp editada` | inactiva | 1 producto (el E2E) |
+| Producto | `__E2E__ Producto e2e-pmwfp` | inactivo, agotado, no destacado, sin imagen | 1 `branch_products`; 0 promociones; 0 partidas de pedido |
+| Pedido | ALEX-000003 (cliente `__E2E__ Cliente estados`) | `delivered` | 1 partida (producto del seed), 6 historial |
+| Subcategoría **sin prefijo** | «Galletas» dentro de **Botanas** | inactiva, 0 productos | Creada el 2026-11-04 durante pruebas del panel; **no** está en el seed. Confirmar y eliminar con la limpieza |
+
+No hay promociones, imágenes ni objetos de Storage `__E2E__` (las promociones E2E ya se
+borraron con `test:e2e:cleanup`).
+
+## 3. Pedidos de desarrollo
+
+| Folio | Estado | Origen | Dependencias |
+| --- | --- | --- | --- |
+| ALEX-000001 | `new` | Desarrollo (2026-11-03, sobre el catálogo ficticio, antes de existir la tienda pública) | 4 partidas, 1 historial |
+| ALEX-000002 | `new` | Desarrollo (ídem) | 3 partidas, 1 historial |
+| ALEX-000003 | `delivered` | E2E autorizado (Fase 8E) | 1 partida, 6 historial |
+
+Los tres son de desarrollo: se compraron productos que no existen. Sus dependencias son
+normales (`order_items` y `order_status_history` con `ON DELETE CASCADE`). ALEX-000001/2 pueden
+contener datos personales reales de quien probó: no deben quedar en producción.
+
+## 4. Sequence de folios
+
+`public.order_folio_seq`: `last_value = 3`, `is_called = true` (el siguiente sería
+ALEX-000004). Inicio 1, incremento 1.
+
+**Recomendación: el primer pedido real debe ser ALEX-000001.** El folio se muestra al
+cliente y al personal; empezar en 000004 sugiere pedidos que nunca existieron y complica
+la conciliación. Es seguro porque, tras la limpieza, `orders` queda vacía (sin colisiones con
+el `unique` del folio) y la idempotencia usa `client_request_id`, no el folio.
+
+Cómo (en 9C.2, en la misma transacción que borra los pedidos, solo si `orders` quedó vacía):
+`alter sequence public.order_folio_seq restart with 1;`. Después del go-live **nunca** se
+reinicia.
+
+Efecto colateral menor: un navegador de desarrollo que guarde en `sessionStorage` el
+comprobante de un ALEX-00000X antiguo seguiría mostrándolo en esa pestaña; no afecta a
+clientes.
+
+## 5. Catálogo semilla
+
+Todo el catálogo activo proviene de [`supabase/seed.sql`](../supabase/seed.sql), que se declara
+"Datos ficticios… No usar en producción":
+
+- **Categorías (5)**: Lácteos, Botanas, Limpieza, Bebidas, Galletas — nombres genéricos que
+  **podrían reutilizarse** si el cliente los confirma (renombrar/reordenar desde el panel).
+- **Subcategorías (11)**: Leche, Yogur, Papas, Cacahuates, Detergentes, Lavatrastes,
+  Refrescos, Agua, Jugos, Dulces, Saladas — igual: reutilizables solo si encajan.
+- **Marcas (7)**: Rancho Lindo, Crujis, Brillex, Doña Galleta, Burbuja, Manantial Claro,
+  Fruta Viva — **inventadas**: se retiran.
+- **Productos (12)**, **precios** y **disponibilidad**: inventados — se retiran.
+- **Promociones (2)**: de demostración — se retiran.
+
+Restricción técnica: `order_items.product_id` es `ON DELETE RESTRICT`. Los productos del seed
+referenciados por los pedidos de desarrollo solo se pueden borrar **después** de borrar esos
+pedidos.
+
+## 6. Sucursal
+
+Actualizada en 9C.2 con un `UPDATE` explícito sobre la fila existente (mismo id; autorizado
+por el usuario), con guarda sobre los valores del seed. Verificado después: 1 sucursal, 7
+horarios sin cambios, 13 `branch_products` y 3 pedidos asociados, catálogo y pedidos sin
+cambios (huellas md5 idénticas antes/después).
+
+| Campo | Estado | Uso en el sistema |
+| --- | --- | --- |
+| `name` | **Confirmado**: "Abarrotes Alex - Concepción Durán" | Header ("Comprando en Concepción Durán"), footer, comprobante y WhatsApp |
+| `address` | **Confirmada**: Calle 24 #18, Concepción Durán, 24400 Champotón, Campeche | Inicio, footer, mensaje de recoger en tienda |
+| `phone` | **Confirmado**: `9844710604` (se muestra "984 471 0604") | Enlace `tel:` en inicio y footer |
+| `whatsapp_number` | **Confirmado**: `529821041154` | **Destino de los pedidos por WhatsApp** (crítico) |
+| `latitude` / `longitude` | `NULL` (eran del seed) | Hoy no se usan; capturarlas si se agregan mapas |
+| `branch_hours` (7 días) | **Temporalmente conservados** (seed) | Inicio («Horario»), estado abierto/cerrado |
+| `is_active` | Activa | Debe seguir activa |
+
+Formatos:
+- **Teléfono público** y **WhatsApp de pedidos** son números distintos.
+- `phone` se guarda con 10 dígitos; `formatPhone` (`src/lib/format.ts`) lo agrupa según la
+  LADA: 3-3-4 en general, 2-4-4 para 55/33/81.
+- `whatsapp_number` va solo con dígitos, en formato internacional sin "+", como exige el
+  `check` del esquema. El "+52 1 982 104 1154" proporcionado se normalizó a 52 + 10 dígitos:
+  el "1" de móviles dejó de usarse en México y `wa.me/52…` es el formato actual.
+- El número no está en el código: `create_order` lo lee de `branches` en cada pedido.
+
+Multisucursal sigue fuera del MVP.
+
+## 7. Información que hay que pedir al dueño
+
+Solo lo que el sistema usa.
+
+**Negocio**
+- ~~Nombre, dirección, WhatsApp de pedidos, teléfono~~: confirmados en 9C.2 (§6).
+- Horario por día de la semana (apertura, cierre o cerrado): **pendiente** (se conserva el del seed).
+- Si hace entregas a domicilio y cómo comunica el costo de envío (el sistema muestra "envío por confirmar").
+
+**Catálogo** (plantilla de hoja de cálculo, ver §8)
+- Categorías y subcategorías (pasillos) en el orden deseado.
+- Marcas (opcionales por producto).
+- Por producto: nombre, categoría/subcategoría, marca (o "sin marca"), presentación
+  (cantidad + unidad: ml, L, g, kg, pieza; o vacío), venta por unidad o a granel (kg),
+  precio, disponible/agotado, destacado sí/no.
+
+**Imágenes**
+- Foto de cada producto (ver §9); al menos de los destacados para el lanzamiento.
+
+**Promociones** (si existen al lanzar)
+- Producto, precio promocional, fecha/hora de inicio y fin (o "hasta nuevo aviso").
+
+**Admin**
+- Nombre a mostrar en el panel.
+- Correo administrativo propio del negocio (para iniciar sesión y, más adelante, recuperar contraseña).
+
+**Branding** (ver §17)
+- ~~Logo~~: recibido e integrado en 9C.2. Opcional: SVG original si existe.
+
+**Dominio**
+- Si ya tiene dominio (y quién lo administra) o cuál desea registrar.
+
+## 8. Estrategia de carga del catálogo inicial (100–500 productos)
+
+**Recomendación: D) combinación — hoja de cálculo (CSV) + importación controlada por script,
+y el panel para correcciones y altas posteriores.**
+
+- **A) Panel uno por uno**: viable para < 50 productos; para 300 son horas de captura y
+  errores. Se usa después del lanzamiento.
+- **B/C) CSV + script**: el cliente (o nosotros con él) llena una plantilla en Google
+  Sheets/Excel; un script versionado (futuro, **no implementado**) la valida y la carga.
+
+Diseño propuesto para el importador (fase futura):
+- Plantilla con columnas: `categoria`, `subcategoria`, `marca`, `nombre`, `presentacion`,
+  `unidad`, `tipo_venta`, `precio`, `disponible`, `destacado`.
+- **Validación completa antes de escribir** (modo ensayo): mismos límites y reglas que el
+  panel (`product-forms`), slugs únicos, precios > 0, unidades válidas; reporte de errores
+  por fila.
+- Escritura en **una transacción** y por la misma ruta de negocio que el panel
+  (`admin_save_product`), con sesión de admin (sin `service_role`); idempotente por `slug`.
+- Productos cargados como **inactivos** para revisión; activación en bloque tras validar en
+  la tienda (ver §19).
+- Imágenes fuera del CSV (§9).
+
+## 9. Imágenes
+
+- Los productos pueden publicarse con el **placeholder** (ya probado en toda la tienda).
+- Flujo inicial: el admin sube fotos **una por una desde el panel** (el flujo existente
+  convierte a WebP, valida y protege contra imágenes enormes), priorizando destacados y más
+  vendidos.
+- Recomendaciones al cliente: fondo claro y liso, producto centrado, formato cuadrado,
+  JPG/PNG/WebP de hasta 10 MB (el sistema las reduce).
+- Carga masiva: **no implementada**; considerarla solo si el volumen lo justifica.
+
+## 10. Cuenta admin del cliente (procedimiento futuro, 9C.2)
+
+1. Crear el usuario en **Supabase → Authentication → Users → Add user** con el correo del
+   cliente (registro público sigue desactivado). Contraseña temporal entregada por canal
+   seguro, o invitación por correo si ya hay SMTP.
+2. Crear su `profiles` con `role = 'admin'` y `full_name` (SQL editor):
+   `insert into public.profiles (id, full_name, role) values ('<id del usuario>', '<nombre>', 'admin');`
+3. Validar: login en `/admin/login`, ver dashboard, pedidos y catálogo.
+4. Eliminar la cuenta de desarrollo (Authentication → Users → Delete; su `profiles` se borra
+   en cascada y el historial de pedidos conserva `changed_by = null`), o al menos
+   deshabilitarla si se quiere mantener un tiempo.
+5. Confirmar que `ADMIN_TEST_EMAIL` / `ADMIN_TEST_PASSWORD` no existen en el entorno de
+   producción (nunca deben ir a Vercel).
+
+## 11. Credenciales E2E
+
+- `ADMIN_TEST_EMAIL` / `ADMIN_TEST_PASSWORD` viven solo en `.env.local`, ignorado por git
+  (`.gitignore: .env*`) y nunca commiteado. `.env.example` (versionado) solo tiene los
+  nombres, sin valores.
+- Solo las leen los scripts de `tests/e2e`; ningún código de la app las usa.
+- En producción **no deben existir**. Tras eliminar la cuenta de desarrollo, las suites
+  autenticadas dejan de poder ejecutarse contra producción (es lo deseado).
+
+## 12. Auth en producción (verificado por la API pública de settings)
+
+- [x] Registro público **desactivado** (`disable_signup: true`).
+- [x] Email/password activo; teléfono, anónimos, OAuth y SAML desactivados.
+- [ ] Admin real (pendiente, §10).
+- [ ] Recuperación de contraseña: **no implementada** en la app. Mientras tanto, el
+  restablecimiento se hace desde el dashboard de Supabase. Para implementarla hacen falta
+  Site URL, Redirect URLs, plantilla de correo y SMTP propio ([security.md](security.md) §7).
+- [ ] SMTP propio: necesario si se implementa recuperación o invitaciones por correo.
+
+## 13. Variables de entorno
+
+| Variable | Tipo | Vercel (Production) | Local | Notas |
+| --- | --- | --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | PUBLIC | Sí | Sí | Se incrusta en el build |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | PUBLIC | Sí | Sí | Llave publishable/anon (pública por diseño) |
+| `ADMIN_TEST_EMAIL` | TEST-ONLY | **No** | Sí (`.env.local`) | Solo E2E |
+| `ADMIN_TEST_PASSWORD` | TEST-ONLY | **No** | Sí (`.env.local`) | Solo E2E |
+| `E2E_BASE_URL` | TEST-ONLY | No | Opcional | URL objetivo de las suites |
+| `CHROME_PATH` | TEST-ONLY | No | Opcional | Chrome para puppeteer |
+| `QA_FAULT_FILE` | TEST-ONLY | **No** | Opcional | Inyección de fallos (`test:e2e:states`) |
+| `NODE_OPTIONS` con `fault-injection.mjs` | TEST-ONLY | **Nunca** | Solo instancia de QA | |
+| `NODE_ENV` | — | La pone la plataforma | — | No definir a mano |
+
+Hoy **no hay variables SERVER (secretas)**: la app no usa `service_role` ni secret keys.
+
+## 14. Vercel (checklist, sin desplegar)
+
+- [ ] Proyecto conectado al repositorio (rama `main` = Production).
+- [ ] Framework: Next.js; build `npm run build`; install `npm ci`; sin output dir manual.
+- [ ] **Node 24.x** en Project Settings (local usa 24; `package.json` no fija `engines`).
+- [ ] Variables: solo las dos `NEXT_PUBLIC_*` en *Production* (§13).
+- [ ] **Previews**: usan la misma base de producción. Proteger los deployments de preview
+  (Deployment Protection) o no definirles las variables, para no exponer el panel ni
+  registrar pedidos desde URLs de prueba.
+- [ ] Dominio agregado y DNS configurado; HTTPS automático (certificado de Vercel). HSTS ya
+  lo envía la app.
+- [ ] Verificar headers en el dominio final: `npm run test:security` con `E2E_BASE_URL`.
+- [ ] Región de funciones cercana a Supabase (`us-east-1`/Washington, `iad1`).
+- [ ] `/admin` responde con `noindex` y `no-store` (ya implementado).
+
+## 15. Supabase: ¿limpiar el actual o crear uno nuevo?
+
+**Recomendación: limpiar y promover el proyecto actual.**
+
+| | Limpiar el actual | Proyecto nuevo |
+| --- | --- | --- |
+| Migraciones | Ya aplicadas y registradas | Reaplicar las 12 (`db push`) |
+| Storage (bucket, políticas) | Listo y probado | Recrear (vía migraciones) |
+| Auth (registro desactivado, etc.) | Listo | Reconfigurar a mano |
+| Riesgo de residuos | Bajo: inventario completo (§1–§3), limpieza en transacción | Ninguno |
+| Pruebas | Todas las suites pasan contra este proyecto | Repetir |
+
+Condiciones para que sea seguro: ejecutar la limpieza de §18 completa, eliminar la cuenta de
+desarrollo (§10) y, como higiene, **rotar la contraseña de la base de datos** si se compartió
+durante el desarrollo. La llave anon es pública por diseño; no hace falta rotarla.
+
+Pendiente de verificar por el dueño en el dashboard: **plan del proyecto** (no visible en
+modo solo lectura). Esto define backups (§16) y si el proyecto puede pausarse por
+inactividad (proyectos gratuitos).
+
+## 16. Backups
+
+Según la documentación de Supabase:
+- Pro/Team/Enterprise: backup diario automático (7/14/30 días); PITR como add-on de pago.
+- Plan gratuito: sin backups accesibles; se recomienda exportar con `supabase db dump`.
+- Los backups de la base **no incluyen** los archivos de Storage (solo sus metadatos).
+
+Antes de producción:
+- [ ] Confirmar el plan y, si es Pro, que aparecen backups diarios en Database → Backups.
+- [ ] Hacer un dump manual **antes** de la limpieza de 9C.2 (`supabase db dump` de esquema
+  y de datos), guardado fuera del repositorio (contiene datos personales de los pedidos de
+  desarrollo). Borrarlo cuando ya no haga falta.
+- [ ] Rutina post-lanzamiento (plan gratuito): dump periódico fuera del repositorio.
+- [ ] Imágenes: el original vive en el equipo del cliente; Storage es la copia publicada.
+- [ ] Migraciones: la fuente de verdad es `supabase/migrations` en git (nunca editar las
+  aplicadas; solo nuevas).
+
+## 17. Branding
+
+**Logo real integrado (9C.2).** Fuente: JPG cuadrado de 1080×1080 entregado por el cliente
+(círculo azul con "ABARROTES" / "ALEX"). El original no se versiona.
+
+Los assets salen de `node scripts/brand-assets.mjs "<logo original>"`. El script solo hace
+adaptaciones técnicas: recorte del margen blanco, máscara circular con transparencia, resize
+y cambio de formato. No recolorea, no redibuja y no vectoriza (no existe un SVG original).
+
+| Archivo | Tamaño | Uso |
+| --- | --- | --- |
+| `public/brand/logo.webp` | 512×512, transparente fuera del círculo (~34 KB) | Header de la tienda (40 px), panel (36 px), login (48 px) vía `BrandLogo` (`next/image` sirve 1x/2x) |
+| `src/app/favicon.ico` | 16, 32 y 48 px (PNG embebidos) | Favicon |
+| `src/app/icon.png` | 192×192, transparente | Ícono de alta resolución |
+| `src/app/apple-icon.png` | 180×180, **opaco** | Apple touch icon: el cuadrado original, con fondo blanco, porque iOS pinta de negro la transparencia |
+
+**Favicon.** Se usa el círculo completo. A 32 y 48 px "ALEX" se lee. A 16 px el texto no es
+legible, pero el círculo azul con la masa blanca de "ALEX" sigue siendo reconocible.
+Recortar solo "ALEX" no mejoraba a 16 px (≈6 px de alto) y se alejaba de la marca.
+
+**Color.** El azul del logo (≈ #0049AF) es algo más oscuro que `primary` (#155EEF). El logo
+se mantiene sin recolorear y la paleta de la UI no cambia.
+
+**Accesibilidad.** El logo siempre acompaña al texto "Abarrotes Alex", así que usa
+`alt=""` (decorativo) y la marca no se anuncia dos veces.
+
+Se eliminó el monograma temporal "A" (`src/app/icon.svg` y los `<span>A</span>`).
+
+## 18. Datos personales y privacidad
+
+El sistema guarda nombre, teléfono, dirección, referencias y notas de cada pedido. Conviene
+que el negocio, con la asesoría que corresponda, defina antes del lanzamiento:
+- **Aviso de privacidad** accesible desde la tienda (hoy no existe página ni enlace;
+  agregarlo sería un cambio menor de la app).
+- Política básica de tratamiento: finalidad (atender el pedido), quién accede (personal del
+  panel), plazo de conservación y cómo pedir borrado.
+
+Esto es un asunto del negocio, no asesoría legal. Técnicamente ya se cumple: panel
+privado, RLS, `noindex` y logs sin PII ([security.md](security.md) §18).
+
+## 19. Plan de limpieza (9C.2 — **NO ejecutado**)
+
+Quién: requiere permisos que el admin no tiene por RLS (no hay `DELETE` de pedidos): lo
+ejecuta el dueño en el SQL editor de Supabase o, con autorización explícita, el CLI sin
+`--read-only`. Siempre después del dump de §16.
+
+Una sola transacción, con verificaciones que abortan si algo no cuadra:
+
+```sql
+begin;
+
+-- 0. Verificaciones previas (abortan si el estado no es el inventariado).
+do $$ begin
+  if (select count(*) from public.orders) <> 3
+     or exists (select 1 from public.orders where folio not in ('ALEX-000001','ALEX-000002','ALEX-000003'))
+  then raise exception 'Hay pedidos inesperados: no continuar'; end if;
+end $$;
+
+-- 1. Pedidos de desarrollo (partidas e historial caen en cascada).
+delete from public.orders where folio in ('ALEX-000001','ALEX-000002','ALEX-000003');
+
+-- 2. Folios: el primer pedido real será ALEX-000001.
+do $$ begin
+  if exists (select 1 from public.orders) then raise exception 'orders no está vacía'; end if;
+end $$;
+alter sequence public.order_folio_seq restart with 1;
+
+-- 3. Promociones del producto E2E (hoy 0; por si acaso).
+delete from public.promotions where branch_product_id in (
+  select bp.id from public.branch_products bp join public.products p on p.id = bp.product_id
+  where p.name like '\_\_E2E\_\_%');
+
+-- 4. Producto E2E (branch_products y promociones caen en cascada).
+delete from public.products where name like '\_\_E2E\_\_%';
+
+-- 5. Taxonomía E2E y la subcategoría de prueba sin productos.
+delete from public.subcategories
+where name like '\_\_E2E\_\_%'
+   or (slug = 'galletas' and category_id = (select id from public.categories where slug = 'botanas'));
+delete from public.brands where name like '\_\_E2E\_\_%';
+delete from public.categories where name like '\_\_E2E\_\_%';
+
+-- 6. Verificación final antes de confirmar.
+select (select count(*) from public.orders) pedidos,
+       (select count(*) from public.products where name like '\_\_E2E\_\_%') e2e;
+
+commit;  -- o rollback si algo no coincide
+```
+
+Orden por FKs: pedidos primero (liberan el `RESTRICT` de `order_items → products`), luego
+promociones → productos (cascada a `branch_products`) → subcategorías (`RESTRICT` desde
+productos) → marcas → categorías (`RESTRICT` desde subcategorías). Storage: no hay objetos
+de prueba. Sucursal: **no se borra**; se actualiza con los datos reales (§6).
+
+La cuenta admin de desarrollo se elimina **después** de crear y validar la del cliente (§10).
+
+## 20. Reemplazo gradual del catálogo semilla
+
+Para no dejar la tienda vacía ni mezclar datos falsos con reales:
+
+1. **Antes de abrir al público** (la tienda aún no se anuncia): limpieza §19 y actualizar
+   sucursal y horario reales.
+2. Decidir con el cliente qué categorías/subcategorías del seed se reutilizan; renombrarlas o
+   crear las nuevas.
+3. Cargar el catálogo real **inactivo** (importación §8 o panel).
+4. Revisar con el cliente en el panel (filtro "Solo inactivos") y en una vista previa.
+5. En una sola ventana: **activar el catálogo real y desactivar el seed** (los productos del
+   seed se ocultan al instante; la tienda nunca queda vacía).
+6. Retirar el seed definitivamente: promociones del seed → productos del seed → marcas
+   ficticias → categorías/subcategorías no reutilizadas (ya sin pedidos que los referencien).
+7. Promociones reales al final, con precios ya confirmados.
+
+## 21. Pruebas después de la limpieza
+
+**SAFE (pueden ejecutarse contra producción final):**
+- `npm test`, `npm run test:db` (PGlite embebido; no tocan la base remota).
+- `npm run test:security` (sin credenciales; nunca envía un pedido válido).
+- `npm run test:e2e:store` (`/api/pedidos` simulado en el navegador; deja carrito vacío).
+- Inspección manual de la tienda sin confirmar pedidos.
+
+**Solo con una cuenta admin de pruebas (no existirá en producción):**
+- `test:e2e`, `test:e2e:orders`, `test:e2e:admin` son de solo lectura, pero inician
+  sesión: tras eliminar la cuenta de desarrollo no aplican, y no se crean credenciales de
+  prueba en producción.
+
+**DESTRUCTIVE (nunca contra producción final):**
+- `test:e2e:order-lifecycle -- --crear-pedido` (crea un pedido y consume un folio).
+- `test:e2e:promotions` / `test:e2e:cleanup` (crean y borran promociones `__E2E__`).
+- Cualquier CRUD `__E2E__` persistente del panel.
+- `test:e2e:states` es seguro para la base, pero requiere una instancia local con
+  inyección de fallos (nunca el despliegue de producción).
+
+Para seguir probando cambios destructivos después del lanzamiento: un proyecto Supabase
+separado de desarrollo/staging (o el Supabase local con `supabase start`).
+
+## 22. Checklist de go-live
+
+**DATOS**
+- [ ] Dump previo a la limpieza (§16).
+- [ ] Limpieza §19 ejecutada y verificada (0 pedidos, 0 `__E2E__`, sequence reiniciada).
+- [x] Sucursal real: nombre, dirección, teléfono y WhatsApp (§6, 9C.2).
+- [ ] Horarios reales (hoy los del seed, conservados temporalmente).
+- [ ] WhatsApp probado manualmente con un pedido real controlado.
+- [ ] Catálogo real cargado, revisado y activado; seed retirado (§20).
+- [ ] Imágenes al menos de destacados (§9).
+- [ ] Promociones reales (si hay).
+
+**AUTH**
+- [ ] Admin del cliente creado y validado (§10).
+- [ ] Cuenta de desarrollo eliminada.
+- [ ] Registro público sigue desactivado.
+- [ ] Procedimiento de restablecimiento de contraseña acordado (dashboard o SMTP).
+
+**SUPABASE**
+- [ ] Plan confirmado (backups, pausas por inactividad).
+- [ ] Contraseña de la base rotada si se compartió.
+- [ ] Site URL = dominio de producción (y Redirect URLs si se implementa recuperación).
+- [ ] Migraciones: `migration list` sin diferencias local/remoto.
+
+**VERCEL**
+- [ ] Proyecto, Node 24, variables de Production (§13–§14).
+- [ ] Previews protegidos o sin variables.
+- [ ] Build de producción exitoso.
+
+**DOMINIO**
+- [ ] Dominio conectado, HTTPS activo, redirección www ↔ raíz definida.
+
+**SEGURIDAD**
+- [ ] `npm run test:security` contra el dominio final: 0 fallos.
+- [ ] Sin `ADMIN_TEST_*` ni otras variables de prueba en Vercel.
+- [ ] Riesgos aceptados revisados ([security.md](security.md) §0).
+
+**QA**
+- [ ] `npm run lint`, `typecheck`, `build`, `npm test`, `test:db` en verde en `main`.
+- [ ] `test:e2e:store` contra el dominio final.
+- [ ] Prueba manual en un iPhone (Safari) y un Android reales: navegar, carrito, checkout.
+- [ ] **Primer pedido real controlado** con el dueño (debe salir ALEX-000001) y su recorrido
+  en el panel hasta Entregado.
+
+**CLIENTE**
+- [ ] Información de §7 entregada y validada.
+- [ ] Capacitación breve del panel (pedidos, estados, productos, promociones, imágenes).
+- [ ] Aviso de privacidad definido por el negocio (§18).
+
+**BACKUP**
+- [ ] Backups automáticos visibles o rutina de dump acordada.
+- [ ] Repositorio respaldado (remoto git).
+
+**DOCUMENTACIÓN**
+- [ ] Este documento actualizado con lo ejecutado (fecha, resultado).
+- [ ] Checklist de [security.md](security.md) §21 revisada.

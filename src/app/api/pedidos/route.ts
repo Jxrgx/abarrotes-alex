@@ -1,3 +1,4 @@
+import { ORDER_BODY_MAX_BYTES, readJsonBody } from "@/lib/http/json-body";
 import { createOrder } from "@/lib/orders/create-order";
 import { checkoutRequestSchema, type OrderError, type OrderErrorCode, orderError } from "@/lib/orders/schema";
 
@@ -23,13 +24,15 @@ function errorResponse(error: OrderError) {
   return Response.json({ error }, { status: STATUS[error.code], headers: NO_STORE });
 }
 
+// Solo POST: los demás métodos responden 405 (Next.js, al no exportarlos).
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return errorResponse(orderError("INVALID_CHECKOUT_DATA"));
+  // Tamaño y Content-Type se validan ANTES de parsear: un payload enorme no llega a Zod
+  // ni a PostgreSQL. El código de dominio se conserva; el estado HTTP indica la causa.
+  const read = await readJsonBody(request, ORDER_BODY_MAX_BYTES);
+  if (!read.ok) {
+    return Response.json({ error: orderError("INVALID_CHECKOUT_DATA") }, { status: read.status, headers: NO_STORE });
   }
+  const body = read.data;
 
   const parsed = checkoutRequestSchema.safeParse(body);
   if (!parsed.success) {

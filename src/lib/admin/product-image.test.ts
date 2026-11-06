@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
+import { crc32, deflateSync } from "node:zlib";
+
 import sharp from "sharp";
 
 import { IMAGE_MESSAGES, isProductImagePath, parseImageIntent, productImagePath, validateImageFile } from "./image-rules";
@@ -134,6 +136,36 @@ describe("procesamiento con sharp (servidor)", () => {
     const gif = await sharp({ create: { width: 50, height: 50, channels: 3, background: "#155EEF" } }).gif().toBuffer();
     const result = await processProductImage(asFile(gif, "logo.png", "image/png"));
     assert.deepEqual(result, { ok: false, message: IMAGE_MESSAGES.type });
+  });
+
+  test("bomba de descompresión: PNG diminuto que declara 30 000 × 30 000 px se rechaza sin decodificar", async () => {
+    // Firma PNG + cabecera IHDR válida (30000×30000, RGB 8 bits) + IDAT mínimo: unos pocos
+    // bytes que, decodificados, ocuparían ~2.7 GB en memoria.
+    const chunk = (type: string, data: Buffer) => {
+      const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+      const length = Buffer.alloc(4);
+      length.writeUInt32BE(data.length);
+      const crc = Buffer.alloc(4);
+      crc.writeUInt32BE(crc32(body) >>> 0);
+      return Buffer.concat([length, body, crc]);
+    };
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(30_000, 0);
+    ihdr.writeUInt32BE(30_000, 4);
+    ihdr.set([8, 2, 0, 0, 0], 8);
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(Buffer.alloc(1))), chunk("IEND", Buffer.alloc(0))]);
+    assert.ok(png.length < 200, `${png.length} bytes`);
+    const started = Date.now();
+    const result = await processProductImage(asFile(png, "bomba.png", "image/png"));
+    assert.equal(result.ok, false);
+    assert.ok(!result.ok && (result.message === IMAGE_MESSAGES.dimensions || result.message === IMAGE_MESSAGES.unprocessable), !result.ok ? result.message : "");
+    assert.ok(Date.now() - started < 2000, "se rechaza al instante (sin decodificar)");
+  });
+
+  test("dimensiones válidas pero absurdas (13 000 × 100) se rechazan", async () => {
+    const wide = await sharp({ create: { width: 13_000, height: 100, channels: 3, background: "#ffffff" } }).png().toBuffer();
+    const result = await processProductImage(asFile(wide, "panoramica.png", "image/png"));
+    assert.deepEqual(result, { ok: false, message: IMAGE_MESSAGES.dimensions });
   });
 
   test("resumen de tamaños", () => {

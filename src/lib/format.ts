@@ -40,10 +40,15 @@ export function formatTime(time: string) {
   return `${displayHours}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
-// 10 dígitos -> "55 0000 0000"; cualquier otro formato se muestra tal cual.
+// Números de 10 dígitos de México, agrupados según su clave LADA:
+// 55/33/81 (CDMX, Guadalajara, Monterrey) son de 2 dígitos -> "55 1234 5678";
+// el resto son de 3 -> "984 471 0604". Cualquier otro formato se muestra tal cual.
+const TWO_DIGIT_AREA_CODES = new Set(["55", "33", "81"]);
+
 export function formatPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
-  return digits.length === 10
+  if (digits.length !== 10) return phone;
+  return TWO_DIGIT_AREA_CODES.has(digits.slice(0, 2))
     ? `${digits.slice(0, 2)} ${digits.slice(2, 6)} ${digits.slice(6)}`
-    : phone;
+    : `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
 }

@@ -2,6 +2,7 @@ import { MapPin } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { branchShortName, getCurrentBranch } from "@/lib/catalog/branches";
 
 import { CartButton } from "./cart-button";
@@ -19,13 +20,7 @@ export function SiteHeader() {
 
       <div className="page-container flex h-16 items-center gap-3 md:gap-6">
         <Link href="/" className="flex min-h-10 min-w-0 items-center gap-2.5 rounded-lg">
-          {/* Espacio reservado para el logo definitivo. */}
-          <span
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-base font-semibold text-primary-foreground"
-            aria-hidden="true"
-          >
-            A
-          </span>
+          <BrandLogo size={40} />
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-base leading-tight font-semibold tracking-tight">
               Abarrotes Alex

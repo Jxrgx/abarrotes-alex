@@ -144,7 +144,7 @@ genérico: piezas pequeñas que cada módulo compone con sus columnas explícita
 
 ```
 page.tsx (Server)    requireAdmin() → Suspense(ListSkeleton) → loadAdminSection(listAdmin…) → Manager | AdminLoadError
-*-manager.tsx        búsqueda/filtros en memoria, tabla (md+) / tarjetas (móvil), diálogos
+*-manager.tsx        búsqueda/filtros en memoria, tabla (lg+, con scroll horizontal si no cabe) / tarjetas (móvil y tablet), diálogos
 catalog-actions.ts   Server Actions: requireAdmin → Zod → cliente autenticado (RLS) → revalidatePath
 ```
 
@@ -267,7 +267,7 @@ la siguiente decena (10, 20, 30…) para poder intercalar después. Marcas no ti
 - **Móvil**: tarjetas (nombre + slug, "Editar" + ⋯ arriba; estado, conteos y orden a todo
   el ancho debajo). CTA compacto "Nueva" junto a la búsqueda. Diálogos como hoja inferior
   a todo el ancho con botones de 44px apilados.
-- **md+**: tabla compacta; CTA "Nueva categoría/subcategoría/marca"; diálogos centrados.
+- **lg+**: tabla compacta (con la barra lateral, si no cabe se desplaza dentro de su tarjeta; Fase 9B); CTA "Nueva categoría/subcategoría/marca"; diálogos centrados.
 - Targets ≥ 40px, sin overflow horizontal (verificado a 390 y 1440).
 
 ## Productos (Fase 8C.1)

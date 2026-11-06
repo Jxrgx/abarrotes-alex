@@ -11,6 +11,8 @@
 - Panel administrativo (navegación, dashboard, métricas, zona horaria): [docs/admin.md](docs/admin.md)
 - Imágenes de producto (Storage, bucket, paths, procesamiento con sharp): [docs/storage.md](docs/storage.md)
 - Promociones (semántica de vigencia, solapamiento, estados, zona horaria): [docs/promotions.md](docs/promotions.md)
+- Seguridad (amenazas, headers/CSP, límites de endpoints, secretos, PII, checklist de producción): [docs/security.md](docs/security.md)
+- Producción (inventario, datos del cliente, plan de limpieza, variables, go-live): [docs/production.md](docs/production.md)
 - Pruebas: `npm test` (unitarias), `npm run test:db` (PGlite: migraciones, RLS, estados de
   pedidos, promociones) y `npm run test:e2e*` (navegador con sesión real). Ver
   [tests/README.md](tests/README.md). Solo datos sintéticos en pruebas versionadas.

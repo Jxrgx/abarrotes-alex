@@ -75,6 +75,12 @@ export const RELATIVE_SCORE_WINDOW = 0.15;
 
 export type LiveSearch = (query: string) => LiveSearchItem[];
 
+// Los campos indexados ya están normalizados con toSearchValue (palabras separadas por espacio).
+function startsEveryWord(entry: IndexedItem, words: string[]) {
+  const text = ` ${entry.name} ${entry.brand} ${entry.subcategory} ${entry.category}`;
+  return words.every((word) => text.includes(` ${word}`));
+}
+
 // El índice Fuse se construye una sola vez por conjunto de productos.
 export function createLiveSearch(items: LiveSearchItem[]): LiveSearch {
   const fuse = new Fuse(
@@ -92,10 +98,16 @@ export function createLiveSearch(items: LiveSearchItem[]): LiveSearch {
 
   return (query) => {
     if (!isLiveQuery(query)) return [];
-    const results = fuse.search(toSearchValue(query));
+    const value = toSearchValue(query);
+    const words = value.split(" ");
+    const results = fuse.search(value);
     const best = results[0]?.score ?? 0;
     return results
       .filter((result) => (result.score ?? 0) <= best + RELATIVE_SCORE_WINDOW)
+      // Desempate estable: primero donde cada palabra está al inicio de una palabra
+      // ("cola" → "Refresco de cola" antes que "Galletas de chocolate"). Mismo
+      // criterio que la búsqueda completa; no agrega ni quita resultados.
+      .sort((a, b) => Number(startsEveryWord(b.item, words)) - Number(startsEveryWord(a.item, words)))
       .slice(0, LIVE_SEARCH_MAX_RESULTS)
       .map((result) => result.item.item);
   };

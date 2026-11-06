@@ -7,11 +7,19 @@ export const IMAGE_ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"] as
 export const IMAGE_ACCEPTED_FORMATS = ["jpeg", "png", "webp"] as const;
 export const IMAGE_MAX_DIMENSION = 1200; // lado mayor de la imagen guardada
 export const IMAGE_WEBP_QUALITY = 82;
+/**
+ * Límites contra "bombas de descompresión" (archivo pequeño que se expande a una imagen
+ * gigantesca en memoria). Se comprueban con la cabecera ANTES de decodificar.
+ * 40 MP cubre fotos de teléfono de hasta ~48 MP recortadas, y 12 000 px por lado.
+ */
+export const IMAGE_MAX_INPUT_PIXELS = 40_000_000;
+export const IMAGE_MAX_INPUT_SIDE = 12_000;
 
 export const IMAGE_MESSAGES = {
   tooLarge: "El archivo es demasiado grande. Máximo 10 MB.",
   type: "Usa una imagen JPG, PNG o WebP.",
   unprocessable: "No pudimos procesar la imagen.",
+  dimensions: "La imagen es demasiado grande (dimensiones). Usa una foto de menor resolución.",
   saveFailed: "No pudimos guardar la imagen. Intenta de nuevo.",
 } as const;
 

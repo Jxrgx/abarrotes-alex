@@ -79,6 +79,14 @@ describe("búsqueda instantánea (Fuse.js)", () => {
   test("sin resultados", () => {
     assert.deepEqual(search("xyz"), []);
   });
+  test("coincidencia al inicio de palabra antes que dentro de otra (cola vs chocolate)", () => {
+    // Mismo par y orden que en el catálogo semilla: "cola" está dentro de "chocolate" y, con
+    // empate exacto de Fuse, ganaba el que aparece primero en el índice.
+    const byName = (name: string) => LIVE_SEARCH_FIXTURE.find((item) => item.name === name)!;
+    const pair = [byName("Galletas de chocolate"), byName("Refresco de cola")];
+    const result = createLiveSearch(pair)("cola").map((item) => item.name);
+    assert.equal(result[0], "Refresco de cola", result.join(", "));
+  });
   test("incluye agotados y conserva precios de oferta", () => {
     assert.equal(search("mango")[0]?.isAvailable, false);
     const coca = search("coca").find((item) => item.presentation === "600 ml" && item.name === "Coca-Cola");

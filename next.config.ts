@@ -11,8 +11,50 @@ const supabaseHost = (() => {
   }
 })();
 
+// ---------------------------------------------------------------------------
+// Headers de seguridad (Fase 9A, docs/security.md). CSP ESTÁTICA (sin nonce): una CSP
+// con nonce obliga a renderizar cada página dinámicamente, incompatible con
+// cacheComponents/PPR. Por eso script-src permite 'unsafe-inline' (scripts inline de
+// Next.js) pero ningún origen externo; lo fuerte está en frame-ancestors, object-src,
+// base-uri, form-action y en limitar conexiones/imágenes a la app y al proyecto Supabase.
+// En desarrollo se agregan 'unsafe-eval' y ws: (React/Turbopack los necesitan).
+const isDev = process.env.NODE_ENV === "development";
+const supabaseOrigin = supabaseHost.startsWith("*") ? "https://*.supabase.co" : `https://${supabaseHost}`;
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${supabaseOrigin}`,
+  "font-src 'self' data:",
+  `connect-src 'self' ${supabaseOrigin}${isDev ? " ws: wss:" : ""}`,
+  "frame-ancestors 'none'",
+  "frame-src 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+].join("; ");
+
+const securityHeaders = [
+  { key: "Content-Security-Policy", value: contentSecurityPolicy },
+  // Anti-clickjacking también para navegadores sin frame-ancestors.
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  // No filtra rutas (/admin/pedidos?q=…, /pedido/ALEX-…) a sitios externos como wa.me.
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // Solo tiene efecto sobre HTTPS (los navegadores lo ignoran en http://localhost).
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+];
+
 const nextConfig: NextConfig = {
   /* config options here */
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
   cacheComponents: true,
   partialPrefetching: true,
   images: {

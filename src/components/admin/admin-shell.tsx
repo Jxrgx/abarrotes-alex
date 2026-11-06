@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { Badge } from "@/components/ui/badge";
 import { type AdminContext, ROLE_LABELS } from "@/lib/auth/session";
 
@@ -64,12 +65,7 @@ export function AdminShell({ context, children }: { context: AdminContext; child
 function BrandMark() {
   return (
     <span className="flex min-w-0 items-center gap-2.5">
-      <span
-        className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground"
-        aria-hidden="true"
-      >
-        A
-      </span>
+      <BrandLogo size={36} />
       <span className="flex min-w-0 flex-col leading-tight">
         <span className="truncate text-sm font-semibold">Abarrotes Alex</span>
         <span className="truncate text-xs text-muted-foreground">Panel administrativo</span>

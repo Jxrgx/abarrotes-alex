@@ -4,6 +4,8 @@ import sharp from "sharp";
 
 import {
   IMAGE_ACCEPTED_FORMATS,
+  IMAGE_MAX_INPUT_PIXELS,
+  IMAGE_MAX_INPUT_SIDE,
   IMAGE_MAX_BYTES,
   IMAGE_MAX_DIMENSION,
   IMAGE_MESSAGES,
@@ -36,13 +38,21 @@ export async function processProductImage(file: File): Promise<{ ok: true; image
 
   try {
     // failOn "error": rechaza archivos truncados/corruptos sin ser demasiado estricto
-    // con advertencias benignas de algunas cámaras. Límite de píxeles por defecto de sharp.
-    const metadata = await sharp(input, { failOn: "error" }).metadata();
+    // con advertencias benignas de algunas cámaras. limitInputPixels: segunda barrera.
+    const options = { failOn: "error", limitInputPixels: IMAGE_MAX_INPUT_PIXELS } as const;
+    // metadata() solo lee la cabecera: las dimensiones se validan ANTES de decodificar.
+    const metadata = await sharp(input, options).metadata();
     if (!(IMAGE_ACCEPTED_FORMATS as readonly string[]).includes(metadata.format ?? "")) {
       return { ok: false, message: IMAGE_MESSAGES.type };
     }
+    const width = metadata.width ?? 0;
+    const height = metadata.height ?? 0;
+    if (width > IMAGE_MAX_INPUT_SIDE || height > IMAGE_MAX_INPUT_SIDE || width * height > IMAGE_MAX_INPUT_PIXELS) {
+      return { ok: false, message: IMAGE_MESSAGES.dimensions };
+    }
 
-    const { data, info } = await sharp(input, { failOn: "error" })
+    const { data, info } = await sharp(input, options)
+      .timeout({ seconds: 20 }) // tiempo máximo de procesamiento
       .rotate()
       .resize({ width: IMAGE_MAX_DIMENSION, height: IMAGE_MAX_DIMENSION, fit: "inside", withoutEnlargement: true })
       .webp({ quality: IMAGE_WEBP_QUALITY })

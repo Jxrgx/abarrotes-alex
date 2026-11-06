@@ -10,11 +10,11 @@ export const metadata: Metadata = { title: "Sin acceso" };
 
 export default function NoAccessPage() {
   return (
-    <div className="flex flex-1 items-center justify-center bg-background-secondary px-4 py-12">
+    <main id="contenido" className="flex flex-1 items-center justify-center bg-background-secondary px-4 py-12">
       <Suspense fallback={<div className="h-64 w-full max-w-sm animate-pulse rounded-xl bg-muted" />}>
         <NoAccess />
       </Suspense>
-    </div>
+    </main>
   );
 }
 

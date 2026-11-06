@@ -6,6 +6,7 @@ import {
   type CartResolveResponse,
   cartResolveRequestSchema,
 } from "@/lib/cart/schema";
+import { CART_BODY_MAX_BYTES, readJsonBody } from "@/lib/http/json-body";
 
 // Resuelve la información pública ACTUAL de los productos de un carrito.
 // - Solo lectura: no crea pedidos ni modifica datos.
@@ -14,16 +15,13 @@ import {
 // La respuesta es solo para mostrar el carrito. Al crear el pedido (Fase 6) el
 // servidor volverá a consultar todo; nada de esto se acepta como autoridad.
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Solicitud inválida." }, { status: 400 });
-  }
+  // Content-Type JSON y máximo 16 KB antes de parsear (100 UUIDs caben en ~4 KB).
+  const read = await readJsonBody(request, CART_BODY_MAX_BYTES);
+  if (!read.ok) return Response.json({ error: "Solicitud inválida." }, { status: read.status, headers: { "Cache-Control": "no-store" } });
 
-  const parsed = cartResolveRequestSchema.safeParse(body);
+  const parsed = cartResolveRequestSchema.safeParse(read.data);
   if (!parsed.success) {
-    return Response.json({ error: "Solicitud inválida." }, { status: 400 });
+    return Response.json({ error: "Solicitud inválida." }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
   const { branchId, productIds } = parsed.data;

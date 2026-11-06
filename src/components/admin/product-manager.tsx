@@ -120,7 +120,7 @@ export function ProductManager({ products, options, branchId }: {
         />
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row">
+          <div className="flex flex-col gap-3 xl:flex-row">
             <div className="flex flex-1 gap-3">
               <SearchInput
                 id="buscar-productos"
@@ -130,15 +130,15 @@ export function ProductManager({ products, options, branchId }: {
                 onChange={(event) => changeFilter(setQuery)(event.target.value)}
                 className="flex-1"
               />
-              <Button onClick={create} className="lg:hidden">
+              <Button onClick={create} className="xl:hidden">
                 <Plus aria-hidden="true" />
                 <span>
                   Nuevo<span className="sr-only sm:not-sr-only"> producto</span>
                 </span>
               </Button>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:flex">
-              <FilterSelect id="filtro-categoria" label="Categoría" value={categoryFilter} onChange={changeFilter(setCategoryFilter)} className="col-span-2 sm:col-span-1 lg:w-48">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:flex">
+              <FilterSelect id="filtro-categoria" label="Categoría" value={categoryFilter} onChange={changeFilter(setCategoryFilter)} className="col-span-2 sm:col-span-1 xl:w-48">
                 <option value="">Todas las categorías</option>
                 {options.categories.map((category) => (
                   <option key={category.id} value={category.id}>
@@ -147,18 +147,18 @@ export function ProductManager({ products, options, branchId }: {
                   </option>
                 ))}
               </FilterSelect>
-              <FilterSelect id="filtro-estado" label="Estado" value={status} onChange={changeFilter((value: string) => setStatus(value as StatusFilter))} className="lg:w-44">
+              <FilterSelect id="filtro-estado" label="Estado" value={status} onChange={changeFilter((value: string) => setStatus(value as StatusFilter))} className="xl:w-44">
                 <option value="">Todos los estados</option>
                 <option value="active">Solo activos</option>
                 <option value="inactive">Solo inactivos</option>
               </FilterSelect>
-              <FilterSelect id="filtro-disponibilidad" label="Disponibilidad" value={availability} onChange={changeFilter((value: string) => setAvailability(value as AvailabilityFilter))} className="lg:w-52">
+              <FilterSelect id="filtro-disponibilidad" label="Disponibilidad" value={availability} onChange={changeFilter((value: string) => setAvailability(value as AvailabilityFilter))} className="xl:w-52">
                 <option value="">Disponibilidad</option>
                 <option value="available">Solo disponibles</option>
                 <option value="soldout">Solo agotados</option>
               </FilterSelect>
             </div>
-            <Button onClick={create} className="hidden lg:inline-flex">
+            <Button onClick={create} className="hidden xl:inline-flex">
               <Plus aria-hidden="true" />
               Nuevo producto
             </Button>
@@ -301,9 +301,9 @@ function ProductCell({ product }: { product: AdminProduct }) {
     <span className="flex min-w-0 items-center gap-3">
       <ProductImage imagePath={product.imagePath} alt="" variant="thumb" className="size-10 shrink-0 overflow-hidden rounded-lg" />
       <span className="min-w-0">
-        <span className={cn("line-clamp-2 font-medium md:block md:truncate", !product.isActive && "text-muted-foreground")}>{product.name}</span>
-        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-subtle-foreground md:flex-nowrap">
-          <span className="md:truncate">{details}</span>
+        <span className={cn("line-clamp-2 font-medium lg:block lg:truncate", !product.isActive && "text-muted-foreground")}>{product.name}</span>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-subtle-foreground lg:flex-nowrap">
+          <span className="lg:truncate">{details}</span>
           {product.isFeatured && (
             <span className="inline-flex shrink-0 items-center gap-0.5 text-warning-strong">
               <Star className="size-3 fill-current" aria-hidden="true" />

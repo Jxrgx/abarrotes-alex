@@ -260,7 +260,7 @@ function ProductCell({ row, multiBranch }: { row: Row; multiBranch: boolean }) {
     <span className="flex min-w-0 items-center gap-3">
       <ProductImage imagePath={row.imagePath} alt="" variant="thumb" className="size-10 shrink-0 overflow-hidden rounded-lg" />
       <span className="min-w-0 space-y-1">
-        <span className={cn("line-clamp-2 font-medium md:block md:truncate", !row.isActive && "text-muted-foreground")}>{row.productName}</span>
+        <span className={cn("line-clamp-2 font-medium lg:block lg:truncate", !row.isActive && "text-muted-foreground")}>{row.productName}</span>
         {details && <span className="block truncate text-xs text-subtle-foreground">{details}</span>}
         <ProductFlags productInactive={!row.productActive} soldOut={!row.isAvailable} />
       </span>

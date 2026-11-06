@@ -37,7 +37,7 @@ async function FooterDetails() {
               Tel.{" "}
               <a
                 href={`tel:${branch.phone}`}
-                className="text-foreground underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center rounded-md text-foreground underline-offset-4 hover:underline"
               >
                 {formatPhone(branch.phone)}
               </a>

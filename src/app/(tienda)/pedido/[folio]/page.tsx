@@ -22,5 +22,15 @@ export default function OrderPage({ params }: PageProps<"/pedido/[folio]">) {
 
 async function OrderContent({ params }: { params: PageProps<"/pedido/[folio]">["params"] }) {
   const { folio } = await params;
-  return <OrderConfirmation folio={decodeURIComponent(folio).toUpperCase()} />;
+  return <OrderConfirmation folio={safeDecode(folio).toUpperCase()} />;
+}
+
+// Un "%" malformado en la URL (p. ej. /pedido/%E0%A4%A) hace lanzar a decodeURIComponent;
+// se usa el texto tal cual: no coincide con ningún folio y se muestra sin comprobante.
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
