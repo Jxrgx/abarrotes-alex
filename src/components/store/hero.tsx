@@ -8,7 +8,8 @@ const HIGHLIGHTS = [
   { icon: Banknote, label: "Pago en efectivo" },
 ];
 
-// Hero compacto: la prioridad es llegar rápido a categorías y productos.
+// Hero compacto: explica en una frase cómo se compra (carrito → datos → WhatsApp) y
+// lleva rápido a los productos. Los beneficios también se ven en móvil.
 export function Hero() {
   return (
     <section aria-labelledby="hero-title" className="page-container pt-4 md:pt-6">
@@ -18,12 +19,12 @@ export function Hero() {
             id="hero-title"
             className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl"
           >
-            Todo lo que necesitas, cerca de ti
+            Haz tu pedido fácil y rápido
           </h1>
           <p className="mt-2 text-base text-muted-foreground">
-            Explora nuestros productos y prepara tu pedido para enviarlo por WhatsApp.
+            Agrega tus productos al carrito, completa tus datos y envía tu pedido por WhatsApp.
           </p>
-          <ul className="mt-4 hidden flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground sm:flex">
+          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
             {HIGHLIGHTS.map(({ icon: Icon, label }) => (
               <li key={label} className="flex items-center gap-1.5">
                 <Icon className="size-4 text-primary" aria-hidden="true" />

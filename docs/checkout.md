@@ -17,6 +17,8 @@ La creación del pedido (validación, precios, folio, atomicidad) está en
 
 ## Formulario
 
+Una sola página con secciones numeradas que orientan, sin bloquear ni navegar: **1 Entrega** (primero: "¿Cómo quieres recibir tu pedido?") → **2 Tus datos** → **3 Dirección de entrega** (solo con domicilio) → **Pago** (3 o 4 según la entrega). **Comentarios** va al final, sin número ni tarjeta (es opcional). En móvil, arriba se recuerda "N productos · $X + envío · Editar"; el resumen completo y "Confirmar pedido" quedan al final, con la nota "Después podrás enviarlo por WhatsApp a Abarrotes Alex." (asociada al botón con `aria-describedby`). Los campos tienen `scroll-margin-top` para que, al enfocar un error, no queden bajo el header fijo. WhatsApp nunca se abre solo: es la acción principal de la confirmación ("Último paso").
+
 | Campo | Regla (cliente) | Notas |
 | --- | --- | --- |
 | Nombre * | 2–120 caracteres | `autocomplete="name"` |

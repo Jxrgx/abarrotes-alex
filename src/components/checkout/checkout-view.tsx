@@ -1,10 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Banknote, Clock, LoaderCircle, MapPin, RefreshCw, ShoppingCart, Store, Truck } from "lucide-react";
+import { AlertCircle, Banknote, Clock, LoaderCircle, MapPin, MessageCircle, RefreshCw, ShoppingCart, Store, Truck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, useMemo, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
 import { type Resolver, useForm, useWatch } from "react-hook-form";
 
 import { useCartResolution } from "@/components/cart/use-cart-resolution";
@@ -15,7 +15,7 @@ import { controlClassName, Field, fieldDescribedBy } from "@/components/ui/field
 import type { HoursGroup } from "@/lib/catalog/hours";
 import { type CartResolution, resolveCartLines } from "@/lib/cart/lines";
 import type { CartState } from "@/lib/cart/schema";
-import { dispatchCart, useCart } from "@/lib/cart/store";
+import { countLabel, dispatchCart, useCart } from "@/lib/cart/store";
 import { formatCents } from "@/lib/format";
 import {
   buildCheckoutRequest,
@@ -268,18 +268,48 @@ function CheckoutForm({
     void form.handleSubmit(submit)(event);
   }
 
+  // Orientación, no navegación: los pasos se numeran según la entrega elegida
+  // (con "Recoger en sucursal" no hay paso de dirección).
+  const steps = deliveryType === "delivery" ? ["delivery", "contact", "address", "payment"] : ["delivery", "contact", "payment"];
+  const stepOf = (key: string) => steps.indexOf(key) + 1;
+
   return (
     <form
       onSubmit={onSubmit}
       noValidate
-      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-8"
+      // scroll-mt: al enfocar un campo con error, no queda bajo el header fijo.
+      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-8 [&_:is(input,textarea)]:scroll-mt-36 md:[&_:is(input,textarea)]:scroll-mt-24"
     >
       <div className="space-y-6">
+        <OrderGlance summary={summary} />
         <p className="text-sm text-muted-foreground">
           Los campos con <span className="text-destructive-strong">*</span> son obligatorios.
         </p>
 
-        <Section title="Tus datos">
+        <Section step={stepOf("delivery")} title="Entrega">
+          <fieldset>
+            <legend className="mb-3 text-sm text-muted-foreground">¿Cómo quieres recibir tu pedido?</legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ChoiceCard
+                icon={Truck}
+                title="Entrega a domicilio"
+                description="Te lo llevamos. La tienda te confirma el costo de envío."
+                checked={deliveryType === "delivery"}
+                input={<input type="radio" value="delivery" className="size-4 accent-primary" {...register("deliveryType")} />}
+              />
+              <ChoiceCard
+                icon={Store}
+                title="Recoger en sucursal"
+                description="Pasa por tu pedido sin costo de envío."
+                checked={deliveryType === "pickup"}
+                input={<input type="radio" value="pickup" className="size-4 accent-primary" {...register("deliveryType")} />}
+              />
+            </div>
+          </fieldset>
+          {deliveryType === "pickup" && <PickupInfo branch={pickupBranch} />}
+        </Section>
+
+        <Section step={stepOf("contact")} title="Tus datos">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="checkout-nombre" label="Nombre" required error={errors.name?.message}>
               <input
@@ -319,29 +349,9 @@ function CheckoutForm({
           </div>
         </Section>
 
-        <Section title="Entrega">
-          <fieldset>
-            <legend className="sr-only">Tipo de entrega</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ChoiceCard
-                icon={Truck}
-                title="Entrega a domicilio"
-                description="El costo de envío se confirma al procesar tu pedido."
-                checked={deliveryType === "delivery"}
-                input={<input type="radio" value="delivery" className="size-4 accent-primary" {...register("deliveryType")} />}
-              />
-              <ChoiceCard
-                icon={Store}
-                title="Recoger en sucursal"
-                description="Pasa por tu pedido sin costo de envío."
-                checked={deliveryType === "pickup"}
-                input={<input type="radio" value="pickup" className="size-4 accent-primary" {...register("deliveryType")} />}
-              />
-            </div>
-          </fieldset>
-
-          {deliveryType === "delivery" ? (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        {deliveryType === "delivery" && (
+          <Section step={stepOf("address")} title="Dirección de entrega">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field id="checkout-direccion" label="Dirección" required className="sm:col-span-2" hint="Calle, número exterior e interior." error={errors.address?.message}>
                 <input
                   id="checkout-direccion"
@@ -381,24 +391,24 @@ function CheckoutForm({
                 />
               </Field>
             </div>
-          ) : (
-            <PickupInfo branch={pickupBranch} />
-          )}
-        </Section>
+          </Section>
+        )}
 
-        <Section title="Pago">
-          <div className="flex items-start gap-3 rounded-lg border bg-background-secondary p-3">
+        <Section step={stepOf("payment")} title="Pago">
+          <p className="flex items-start gap-2 text-sm">
             <Banknote className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
-            <div>
-              <p className="text-sm font-medium">Efectivo</p>
-              <p className="text-sm text-muted-foreground">El pago se realiza al recibir o recoger tu pedido.</p>
-            </div>
-          </div>
+            <span>
+              <span className="font-medium">Efectivo.</span>{" "}
+              <span className="text-muted-foreground">
+                Pagas al {deliveryType === "delivery" ? "recibir" : "recoger"} tu pedido.
+              </span>
+            </span>
+          </p>
           <Field
             id="checkout-efectivo"
             label="¿Con cuánto pagarás?"
             className="mt-4 sm:max-w-xs"
-            hint={changeCents !== null ? `Cambio aproximado: ${formatCents(changeCents)}` : "Ej. $500. Así preparamos tu cambio."}
+            hint={changeCents !== null ? `Cambio aproximado: ${formatCents(changeCents)}` : "Ej. $500, así preparamos tu cambio."}
             error={errors.cashAmount?.message}
           >
             <div className="relative">
@@ -421,25 +431,30 @@ function CheckoutForm({
           </Field>
         </Section>
 
-        <Section title="Indicaciones adicionales" headingVisible={false}>
+        {/* Opcional (la etiqueta lo indica): sin número ni tarjeta, para no competir con los pasos obligatorios. */}
+        <section aria-labelledby="checkout-comentarios" className="px-1">
+          <h2 id="checkout-comentarios" className="text-base font-medium">
+            Comentarios
+          </h2>
           <Field
             id="checkout-notas"
-            label="Indicaciones adicionales"
+            label="Indicaciones para la tienda"
+            className="mt-2"
             hint={`${notes.length}/${NOTES_MAX_LENGTH} caracteres`}
             error={errors.notes?.message}
           >
             <textarea
               id="checkout-notas"
-              rows={3}
+              rows={2}
               maxLength={NOTES_MAX_LENGTH + 50}
               placeholder="Ej. Si no hay Coca-Cola normal, puede ser sin azúcar."
               aria-invalid={Boolean(errors.notes)}
               aria-describedby={fieldDescribedBy("checkout-notas", { hint: true, error: errors.notes?.message })}
-              className={cn(controlClassName, "min-h-24 resize-y py-2.5")}
+              className={cn(controlClassName, "min-h-20 resize-y py-2.5")}
               {...register("notes")}
             />
           </Field>
-        </Section>
+        </section>
       </div>
 
       <CheckoutSummary summary={summary} refreshing={refreshing}>
@@ -450,18 +465,20 @@ function CheckoutForm({
           className="mt-4 w-full"
           disabled={submitting || cannotSubmit}
           aria-busy={submitting}
+          aria-describedby="checkout-siguiente-paso"
         >
           {submitting ? (
             <>
               <LoaderCircle className="animate-spin" aria-hidden="true" />
-              Procesando pedido...
+              Confirmando pedido…
             </>
           ) : (
             "Confirmar pedido"
           )}
         </Button>
-        <p className="mt-2 text-center text-xs text-subtle-foreground">
-          Después podrás enviarlo por WhatsApp a la sucursal.
+        <p id="checkout-siguiente-paso" className="mt-3 text-center text-sm text-muted-foreground">
+          <MessageCircle className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
+          Después podrás enviarlo por WhatsApp a Abarrotes Alex.
         </p>
       </CheckoutSummary>
     </form>
@@ -612,12 +629,41 @@ function CheckoutSummary({
   );
 }
 
-function Section({ title, headingVisible = true, children }: { title: string; headingVisible?: boolean; children: ReactNode }) {
+// Sección numerada del checkout. El número orienta (no bloquea ni navega); el
+// encabezado h2 da la estructura semántica.
+function Section({ step, title, children }: { step: number; title: string; children: ReactNode }) {
+  const id = useId();
   return (
-    <section className="rounded-xl border bg-card p-4 md:p-5" aria-label={headingVisible ? undefined : title}>
-      {headingVisible && <h2 className="mb-4 text-lg font-semibold">{title}</h2>}
+    <section aria-labelledby={id} className="rounded-xl border bg-card p-4 md:p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary tabular-nums"
+        >
+          {step}
+        </span>
+        <h2 id={id} className="text-lg font-semibold">
+          {title}
+        </h2>
+      </div>
       {children}
     </section>
+  );
+}
+
+// Móvil: el resumen completo y el botón están al final; arriba se recuerda qué se pide.
+function OrderGlance({ summary }: { summary: ReturnType<typeof resolveCartLines> }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-background-secondary px-3 py-1 text-sm lg:hidden">
+      <p>
+        {countLabel(summary.payableCount)} ·{" "}
+        <span className="font-semibold tabular-nums">{formatCents(summary.subtotalCents)}</span>{" "}
+        <span className="text-muted-foreground">+ envío</span>
+      </p>
+      <Link href="/carrito" className="inline-flex h-10 shrink-0 items-center font-medium text-primary hover:text-primary-hover">
+        Editar
+      </Link>
+    </div>
   );
 }
 
@@ -659,6 +705,7 @@ function PickupInfo({ branch }: { branch: PickupBranch | null }) {
   }
   return (
     <div className="mt-4 rounded-lg border bg-background-secondary p-3 text-sm">
+      <p className="text-muted-foreground">Recoges tu pedido en:</p>
       <p className="font-medium">{branch.name}</p>
       {branch.address && (
         <p className="mt-1 flex items-start gap-2 text-muted-foreground">

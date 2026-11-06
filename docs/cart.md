@@ -60,6 +60,7 @@ El storage solo se reescribe en la siguiente acción del usuario.
 - `add` e `increment` reciben `available` desde la UI: un producto agotado no se
   acepta aunque se invoque la acción.
 - El contador del header es la **suma de cantidades**, no los productos distintos.
+- `CartBar` (móvil, solo `/` y `/productos`): barra inferior "N productos · Ver mi pedido" cuando el carrito tiene productos. Lee `useCartCount` (sin peticiones ni precios: el subtotal real se calcula en `/carrito`), deja un espacio al final de la página, respeta safe-area y se oculta mientras se escribe en un campo. En md+ no aparece (el carrito del header es visible).
 
 ### Hidratación
 

@@ -35,13 +35,16 @@ export function OrderConfirmation({ folio }: { folio: string }) {
         <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-success-soft">
           <CircleCheck className="size-8 text-success-strong" aria-hidden="true" />
         </span>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">¡Pedido registrado!</h1>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">¡Pedido confirmado!</h1>
         <p className="mt-2 text-muted-foreground">
           Folio <span className="font-semibold text-foreground tabular-nums">{receipt.folio}</span>
         </p>
-        <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
-          Tu pedido ya quedó registrado. Para agilizar la atención, envíalo también por WhatsApp.
-        </p>
+        {whatsappUrl && (
+          <p className="mx-auto mt-4 max-w-md text-base">
+            <span className="font-semibold">Último paso:</span> envíalo por WhatsApp a Abarrotes Alex para confirmar los
+            detalles con la tienda.
+          </p>
+        )}
         {whatsappUrl ? (
           <a
             href={whatsappUrl}

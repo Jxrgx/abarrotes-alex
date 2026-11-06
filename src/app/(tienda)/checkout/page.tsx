@@ -6,15 +6,15 @@ import { getBranchHours, getCurrentBranch } from "@/lib/catalog/branches";
 import { groupBranchHours } from "@/lib/catalog/hours";
 
 export const metadata: Metadata = {
-  title: "Finalizar pedido",
-  description: "Confirma tus datos de entrega y registra tu pedido en Abarrotes Alex.",
+  title: "Completa tu pedido",
+  description: "Elige cómo recibir tu pedido, completa tus datos y confírmalo en Abarrotes Alex.",
   robots: { index: false },
 };
 
 export default function CheckoutPage() {
   return (
     <div className="page-container py-6 md:py-8">
-      <h1 className="mb-4 text-3xl font-semibold tracking-tight md:mb-6 md:text-4xl">Finalizar pedido</h1>
+      <h1 className="mb-4 text-3xl font-semibold tracking-tight md:mb-6 md:text-4xl">Completa tu pedido</h1>
       <Suspense fallback={<CheckoutSkeleton />}>
         <CheckoutLoader />
       </Suspense>

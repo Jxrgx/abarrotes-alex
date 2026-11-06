@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, RefreshCw, ShoppingCart, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowRight, RefreshCw, ShoppingCart, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -218,15 +218,19 @@ function CartSummary({
       <h2 id="carrito-resumen" className="text-lg font-semibold">
         Resumen
       </h2>
-      <dl className="mt-3">
+      <dl className="mt-3 space-y-2 text-sm">
         <div className="flex items-baseline justify-between gap-4">
-          <dt className="text-sm text-muted-foreground">Subtotal ({countLabel(payableCount)})</dt>
-          <dd className="text-xl font-semibold tabular-nums">{formatCents(subtotalCents)}</dd>
+          <dt className="text-muted-foreground">Subtotal ({countLabel(payableCount)})</dt>
+          <dd className="text-xl font-semibold text-foreground tabular-nums">{formatCents(subtotalCents)}</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-4">
+          <dt className="text-muted-foreground">Envío</dt>
+          <dd>Por confirmar</dd>
         </div>
       </dl>
       <p className="mt-2 text-sm text-muted-foreground">
-        El costo de envío se confirma al procesar tu pedido.
-        {blocked && " No incluye productos agotados o no disponibles."}
+        Si eliges entrega a domicilio, la tienda te confirma el costo de envío. Recoger en sucursal no tiene costo.
+        {blocked && " El subtotal no incluye productos agotados o no disponibles."}
       </p>
 
       {blocked && (
@@ -241,8 +245,12 @@ function CartSummary({
       ) : (
         <Link href="/checkout" className={buttonVariants({ size: "lg", className: "mt-4 w-full" })}>
           Continuar pedido
+          <ArrowRight aria-hidden="true" />
         </Link>
       )}
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        Después eliges cómo recibirlo y lo envías por WhatsApp.
+      </p>
     </section>
   );
 }
