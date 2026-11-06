@@ -19,13 +19,15 @@ try {
   const page = await newPage(ctx, 390);
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
 
-  console.log("== Manifest (solo en el panel)");
+  console.log("== Manifests (tienda y panel separados)");
   const manifestHref = async (path) => {
     await page.goto(`${BASE}${path}`, { waitUntil: "networkidle0" });
-    return page.evaluate(() => document.querySelector("link[rel=manifest]")?.getAttribute("href") ?? null);
+    return page.evaluate(() => [...document.querySelectorAll("link[rel=manifest]")].map((link) => link.getAttribute("href")).join(","));
   };
-  check("la tienda no se ofrece como app (sin manifest)", (await manifestHref("/")) === null);
-  check("/admin/login enlaza el manifest del panel", (await manifestHref("/admin/login")) === "/admin.webmanifest");
+  check("la tienda enlaza solo su manifest (abre /)", (await manifestHref("/")) === "/tienda.webmanifest");
+  check("/admin/login enlaza solo el manifest del panel", (await manifestHref("/admin/login")) === "/admin.webmanifest");
+  const store = await (await fetch(`${BASE}/tienda.webmanifest`)).json();
+  check("manifest de la tienda: id/start_url /, standalone", store.id === "/" && store.start_url === "/" && store.display === "standalone");
   const manifest = await (await fetch(`${BASE}/admin.webmanifest`)).json();
   check("manifest: start_url /admin, standalone, iconos 192/512", manifest.start_url === "/admin" && manifest.display === "standalone" && ["192x192", "512x512"].every((size) => manifest.icons.some((icon) => icon.sizes === size)));
 

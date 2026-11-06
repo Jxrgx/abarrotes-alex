@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "Abarrotes Alex",
+  "short_name": "Abarrotes Alex",
+  "description": "Haz tu pedido en Abarrotes Alex: bebidas, botanas, lácteos, limpieza y más.",
+  "lang": "es-MX",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "categories": ["shopping", "food"],
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

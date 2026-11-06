@@ -21,8 +21,8 @@ Panel abierto ◄── Broadcast "admin:orders" (solo admins, RLS) → aviso + 
 ## PWA del panel
 
 - `public/admin.webmanifest`, enlazado **solo** desde `src/app/admin/layout.tsx`
-  (`metadata.manifest`). La tienda pública no tiene manifest: a un cliente no se le ofrece
-  "instalar" una app que abre el login del panel.
+  (`metadata.manifest`). A un cliente nunca se le ofrece instalar una app que abre el
+  login del panel: la tienda tiene su propia PWA (abajo).
 - `start_url: /admin`, `scope: /admin`, `display: standalone`, `id: /admin`. Al abrir el
   icono: con sesión → dashboard; sin sesión → login (lo decide `proxy.ts`).
 - Iconos derivados del logo real con `scripts/brand-assets.mjs`: `icon-192.png`,
@@ -32,6 +32,25 @@ Panel abierto ◄── Broadcast "admin:orders" (solo admins, RLS) → aviso + 
   `start_url` y `display` standalone. No hace falta banner propio: Chrome ofrece
   "Instalar aplicación" en el menú ⋮. La tarjeta del dashboard muestra una ayuda discreta
   si la app no corre instalada.
+
+## PWA de la tienda (clientes)
+
+- `public/tienda.webmanifest`, enlazado solo desde `src/app/(tienda)/layout.tsx` con un
+  `<link rel="manifest">` (React lo coloca en `<head>`). No con `metadata.manifest`: en
+  páginas con `generateMetadata` dinámico (`/productos`) Next.js transmite los metadatos
+  al final de `<body>` y Chrome solo lee el manifest en `<head>`.
+  `id`/`start_url`/`scope`: `/`, `display: standalone`, mismos iconos de marca.
+- Son **dos apps distintas** (ids `/` y `/admin`): instalar la tienda abre `/`; instalar
+  el panel abre `/admin`. Las páginas del panel no enlazan el manifest de la tienda
+  (el `metadata.manifest` del layout de `/admin` lo reemplaza), así que desde `/admin`
+  solo se ofrece instalar el panel, y desde la tienda solo la tienda.
+- Los scopes están anidados (`/admin` ⊂ `/`): Chrome Android elige la app instalada con
+  el scope más específico, así que las rutas `/admin/...` (p. ej. el clic en una
+  notificación) deben seguir abriendo la app del panel aunque ambas estén instaladas.
+  Verificarlo en el dispositivo del dueño al instalar las dos.
+- No usa el Service Worker: la tienda no lo registra, no pide permisos de notificación y
+  no tiene modo offline. El SW (scope `/`) solo atiende `push`/`notificationclick` del
+  panel y no tiene handler de `fetch`, así que no altera la navegación de la tienda.
 
 ### Instalación en Android (dueño)
 

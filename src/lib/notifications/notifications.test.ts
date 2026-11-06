@@ -263,3 +263,32 @@ describe("manifest de la PWA del panel", () => {
     }
   });
 });
+
+describe("manifest de la PWA de la tienda", () => {
+  const store = JSON.parse(readFileSync("public/tienda.webmanifest", "utf8"));
+  const admin = JSON.parse(readFileSync("public/admin.webmanifest", "utf8"));
+
+  test("instalable en Chrome: abre la tienda (/), standalone, iconos 192/512 y maskable", () => {
+    assert.equal(store.name, "Abarrotes Alex");
+    assert.ok(store.short_name);
+    assert.equal(store.start_url, "/");
+    assert.equal(store.scope, "/");
+    assert.equal(store.display, "standalone");
+    assert.equal(store.prefer_related_applications, undefined);
+    const sizes = store.icons.map((icon: { sizes: string; purpose: string }) => `${icon.sizes}:${icon.purpose}`);
+    assert.deepEqual(sizes.sort(), ["192x192:any", "512x512:any", "512x512:maskable"]);
+  });
+
+  test("es una app distinta del panel: id y start_url propios", () => {
+    assert.notEqual(store.id, admin.id);
+    assert.notEqual(store.start_url, admin.start_url);
+    assert.ok(!store.start_url.startsWith("/admin"));
+  });
+
+  test("los iconos existen y tienen el tamaño declarado", async () => {
+    for (const icon of store.icons as { src: string; sizes: string }[]) {
+      const meta = await sharp(`public${icon.src}`).metadata();
+      assert.equal(`${meta.width}x${meta.height}`, icon.sizes, icon.src);
+    }
+  });
+});
