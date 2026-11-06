@@ -627,3 +627,18 @@ Solo se marca como probado lo que efectivamente se probó en un dispositivo fís
 3. Dominio en Vercel y Supabase Auth URLs al dominio final.
 4. `SEARCH_INDEXING_ENABLED = true` en `next.config.ts`, commit y deploy.
 5. QA remoto contra el dominio final y checklist de go-live (§22).
+
+## 24. Notificaciones de pedidos (Fase 10)
+
+Ver [notifications.md](notifications.md). Pasos externos, en orden:
+
+1. Generar claves VAPID y el secreto de despacho (local, sin versionar).
+2. Aplicar la migración `20261106000200_order_notifications.sql` (`supabase db push --remote`).
+3. Guardar el hash del secreto: `select private.set_push_dispatch_secret('<secreto>');` (SQL editor).
+4. Vercel → Production: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (Sensitive),
+   `VAPID_SUBJECT`, `PUSH_DISPATCH_SECRET` (Sensitive). Redeploy.
+5. Android de Alexander: instalar la app, iniciar sesión, activar notificaciones.
+6. Pedido real controlado (con autorización) para validar push y panel en vivo.
+
+El copy "¡Pedido recibido!" y WhatsApp opcional deben publicarse **junto con** los pasos 2–5:
+sin ellos el pedido se registra, pero el dueño no recibe aviso.

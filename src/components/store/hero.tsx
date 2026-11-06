@@ -8,7 +8,7 @@ const HIGHLIGHTS = [
   { icon: Banknote, label: "Pago en efectivo" },
 ];
 
-// Hero compacto: explica en una frase cómo se compra (carrito → datos → WhatsApp) y
+// Hero compacto: explica en una frase cómo se compra (carrito → datos → confirmar) y
 // lleva rápido a los productos. Los beneficios también se ven en móvil.
 export function Hero() {
   return (
@@ -22,7 +22,7 @@ export function Hero() {
             Haz tu pedido fácil y rápido
           </h1>
           <p className="mt-2 text-base text-muted-foreground">
-            Agrega tus productos al carrito, completa tus datos y envía tu pedido por WhatsApp.
+            Agrega tus productos al carrito, completa tus datos y confirma tu pedido.
           </p>
           <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
             {HIGHLIGHTS.map(({ icon: Icon, label }) => (

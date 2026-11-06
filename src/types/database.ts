@@ -450,6 +450,50 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_failure_at: string | null
+          last_success_at: string | null
+          p256dh: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          p256dh: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          p256dh?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       promotions: {
         Row: {
           branch_product_id: string
@@ -564,6 +608,10 @@ export type Database = {
         }
         Returns: string
       }
+      claim_order_push: {
+        Args: { p_order_id: string; p_secret: string }
+        Returns: Json
+      }
       create_order: {
         Args: {
           p_address?: string
@@ -582,7 +630,21 @@ export type Database = {
         }
         Returns: Json
       }
+      finish_order_push: {
+        Args: {
+          p_failed_endpoints: string[]
+          p_gone_endpoints: string[]
+          p_ok_endpoints: string[]
+          p_order_id: string
+          p_secret: string
+        }
+        Returns: undefined
+      }
       next_order_folio: { Args: never; Returns: string }
+      save_push_subscription: {
+        Args: { p_auth: string; p_endpoint: string; p_p256dh: string }
+        Returns: undefined
+      }
       update_order_status: {
         Args: {
           p_expected_status: Database["public"]["Enums"]["order_status"]

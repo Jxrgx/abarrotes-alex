@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     template: "%s | Abarrotes Alex",
   },
   description:
-    "Abarrotes Alex: bebidas, botanas, lácteos, limpieza y más. Arma tu pedido y envíalo por WhatsApp.",
+    "Abarrotes Alex: bebidas, botanas, lácteos, limpieza y más. Arma tu pedido en línea.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

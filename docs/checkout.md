@@ -118,3 +118,13 @@ El header queda en 0 y `/carrito` muestra el estado vacío.
   validaciones, errores simulados del servidor, red caída + reintento con el mismo
   id, doble clic, éxito real (domicilio y recoger), vaciado, refresh, confirmación
   sin comprobante. Los pedidos de prueba se borraron y la sequence se reinició.
+
+## Pedido recibido y WhatsApp opcional (Fase 10)
+
+El pedido llega a la tienda al confirmarse (registrado en la base; aviso al dueño por push y
+panel en vivo, ver [notifications.md](notifications.md)). La confirmación dice **"¡Pedido
+recibido!"** ("Tu pedido ALEX-… fue enviado a Abarrotes Alex. En breve será procesado. Conserva tu
+folio."). WhatsApp es un botón secundario, **"Contactar por WhatsApp"**, con el mensaje "Hola, tengo
+una consulta sobre mi pedido ALEX-…" y el resumen. Nunca se abre solo. No se promete que el dueño
+vio la notificación (Web Push no garantiza la entrega). Junto a "Confirmar pedido": "Tu pedido se
+envía directamente a Abarrotes Alex."

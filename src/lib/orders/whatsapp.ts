@@ -24,9 +24,9 @@ function singleLine(value: string) {
 export function buildOrderWhatsAppMessage(receipt: OrderReceipt, contact: OrderContact) {
   const shippingKnown = receipt.shippingCents !== null;
   const lines: string[] = [
-    `Hola, quiero realizar el pedido ${receipt.folio}.`,
+    `Hola, tengo una consulta sobre mi pedido ${receipt.folio}.`,
     "",
-    "*PEDIDO*",
+    "*MI PEDIDO*",
     ...receipt.items.map((item) => {
       const name = [item.name, item.presentation].filter(Boolean).join(" ");
       return `${item.quantity} × ${name} — ${formatCents(item.subtotalCents)}`;

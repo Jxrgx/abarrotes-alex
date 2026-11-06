@@ -249,3 +249,13 @@ con acento o diéresis (á à â ä é … ü, también en mayúsculas). **Conse
 No se reutilizó `private.search_normalize` del catálogo porque el diccionario de `unaccent`
 también convierte **ñ → n** (verificado en Supabase: "Peña" → "pena"). En el catálogo eso se
 mantiene (buscar "pena" encuentra "peña"); en pedidos, "Peña" y "Pena" son nombres distintos.
+
+## Notificación de pedido nuevo (Fase 10)
+
+Ver [notifications.md](notifications.md). `create_order` no cambió. Un trigger `AFTER INSERT` en
+`orders` (migración `20261106000200`) crea un evento por pedido en `private.order_push_events`
+y emite un Broadcast privado mínimo (`order_id`, `folio`). `POST /api/pedidos`, después de
+responder (`after()`), reclama el envío del push en la base (como máximo una vez por pedido,
+también en reintentos `replayed`). Un fallo del push nunca cambia la respuesta del pedido.
+Pedidos creados por RPC directa (`create_order` sigue público, Fase 9A) no envían push, pero sí
+aparecen en el panel en vivo.

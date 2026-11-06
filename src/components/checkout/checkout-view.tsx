@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Banknote, Clock, LoaderCircle, MapPin, MessageCircle, RefreshCw, ShoppingCart, Store, Truck } from "lucide-react";
+import { AlertCircle, Banknote, Clock, LoaderCircle, MapPin, RefreshCw, Send, ShoppingCart, Store, Truck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
@@ -487,8 +487,8 @@ function CheckoutForm({
           )}
         </Button>
         <p id="checkout-siguiente-paso" className="mt-3 text-center text-sm text-muted-foreground">
-          <MessageCircle className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
-          Después podrás enviarlo por WhatsApp a Abarrotes Alex.
+          <Send className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
+          Tu pedido se envía directamente a Abarrotes Alex.
         </p>
       </CheckoutSummary>
     </form>

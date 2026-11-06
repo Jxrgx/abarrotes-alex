@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: { default: "Panel administrativo", template: "%s | Admin · Abarrotes Alex" },
   robots: { index: false, follow: false },
+  // PWA del panel (instalable desde Chrome Android). Solo /admin enlaza el manifest:
+  // la tienda pública no se ofrece como app a los clientes. Ver docs/notifications.md.
+  manifest: "/admin.webmanifest",
 };
 
 // Base de /admin: sin el header ni el footer de la tienda.

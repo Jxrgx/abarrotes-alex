@@ -503,3 +503,14 @@ se registran en logs (solo códigos de error), no van a la tienda ni a pruebas v
 - Promociones y sucursales (reutilizando el patrón anterior).
 - 8E: lista y detalle de pedidos, cambio de estado (con validación de transiciones).
 - Selector de sucursal cuando exista más de una (`getAdminBranch(preferredId)` ya lo admite).
+
+## Notificaciones de pedidos y panel en vivo (Fase 10)
+
+Ver [notifications.md](notifications.md).
+- Dashboard: tarjeta **"Notificaciones de pedidos"** (`components/admin/notifications-card.tsx`):
+  activar/desactivar por dispositivo (el permiso solo se pide al pulsar), sonido y ayuda para
+  instalar la app.
+- Todo el panel: `OrderAlerts` (en `AdminShell`) escucha el Broadcast privado `admin:orders` y
+  los mensajes del Service Worker → aviso "Nuevo pedido ALEX-…" con "Ver pedido",
+  `router.refresh()` y sonido discreto, una sola vez por pedido.
+- PWA: `/admin.webmanifest` (solo enlazado en `/admin`), `start_url: /admin`.

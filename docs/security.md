@@ -303,3 +303,18 @@ La tienda no cachea datos de sesión: usa el cliente público, sin cookies.
 - [ ] Logs revisados (sin PII) tras una semana de operación
 - [ ] `npm audit` revisado (runtime en 0)
 - [ ] Pruebas completas: `npm test`, `test:db`, `test:security`, `test:e2e`, `test:e2e:orders`
+
+## Notificaciones de pedidos (Fase 10)
+
+Ver [notifications.md](notifications.md).
+- `push_subscriptions`: RLS (cada admin solo ve/borra las suyas; sin escritura directa; anon sin
+  acceso). Endpoints y claves nunca en logs.
+- Despacho sin `service_role`: `claim_order_push` / `finish_order_push` exigen un secreto propio
+  (`PUSH_DISPATCH_SECRET`, server-only); la base guarda solo su SHA-256.
+- Realtime: Broadcast **privado** `admin:orders` con RLS en `realtime.messages` (solo admins
+  reciben; nadie publica desde el cliente). Payload mínimo `{ order_id, folio }`.
+- Push sin PII: folio, total y tipo de entrega. El clic solo abre `/admin/pedidos/<uuid>`.
+- Service Worker sin `fetch`: no cachea panel, pedidos, Auth ni APIs.
+- CSP: se agregó solo `wss://<host exacto de Supabase>` en `connect-src`.
+- `VAPID_PRIVATE_KEY` y `PUSH_DISPATCH_SECRET`: secretos de servidor (Vercel Production,
+  Sensitive). `NEXT_PUBLIC_VAPID_PUBLIC_KEY` es pública por diseño.

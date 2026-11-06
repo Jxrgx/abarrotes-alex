@@ -6,6 +6,7 @@ import { type AdminContext, ROLE_LABELS } from "@/lib/auth/session";
 
 import { AdminNavList } from "./admin-nav";
 import { MobileAdminNav } from "./mobile-admin-nav";
+import { OrderAlerts } from "./order-alerts";
 import { SignOutButton } from "./sign-out-button";
 import { ToastProvider } from "./toast";
 
@@ -56,6 +57,8 @@ export function AdminShell({ context, children }: { context: AdminContext; child
 
         <main id="contenido" className="flex-1 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
           <ToastProvider>{children}</ToastProvider>
+          {/* Pedidos nuevos en vivo (Realtime + push con el panel abierto). */}
+          <OrderAlerts />
         </main>
       </div>
     </div>

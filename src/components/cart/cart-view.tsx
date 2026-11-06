@@ -249,7 +249,7 @@ function CartSummary({
         </Link>
       )}
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        Después eliges cómo recibirlo y lo envías por WhatsApp.
+        Después eliges cómo recibirlo y confirmas tu pedido.
       </p>
     </section>
   );

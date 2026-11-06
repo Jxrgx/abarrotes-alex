@@ -34,6 +34,17 @@ alter table storage.objects enable row level security;
 create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
 grant usage on schema storage to anon, authenticated;
 grant all on storage.objects to anon, authenticated;
+-- Stub de Supabase Realtime: realtime.send inserta en realtime.messages (como en Supabase)
+-- y realtime.topic() lee el topic de la conexión (setting realtime.topic en las pruebas).
+create schema realtime;
+create table realtime.messages (id bigserial primary key, topic text not null, extension text not null, payload jsonb, event text, private boolean default true, inserted_at timestamptz default now());
+alter table realtime.messages enable row level security;
+create function realtime.topic() returns text language sql stable as $$ select nullif(current_setting('realtime.topic', true), '') $$;
+create function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void language sql security definer as $$
+  insert into realtime.messages (topic, extension, payload, event, private) values (topic, 'broadcast', payload, event, private) $$;
+grant usage on schema realtime to anon, authenticated;
+grant select on realtime.messages to anon, authenticated;
+grant execute on function realtime.topic() to anon, authenticated;
 `;
 
 export const USERS = {
@@ -60,11 +71,13 @@ export async function createDatabase() {
    * Ejecuta SQL como un rol de Supabase (anon | admin | admin2 | employee | noprofile).
    * persist=false → la transacción se revierte.
    */
-  async function as(who, sql, params = [], { persist = false } = {}) {
+  async function as(who, sql, params = [], { persist = false, settings = {} } = {}) {
     const role = who === "anon" ? "anon" : "authenticated";
     await db.exec(`begin; set local role ${role};`);
     try {
       if (USERS[who]) await db.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: USERS[who], role })]);
+      // Ajustes de la sesión, p. ej. { "realtime.topic": "admin:orders" } (stub de Realtime).
+      for (const [key, value] of Object.entries(settings)) await db.query(`select set_config($1, $2, true)`, [key, value]);
       const result = await db.query(sql, params);
       await db.exec(persist ? "commit;" : "rollback;");
       return { ok: true, rows: result.rows };

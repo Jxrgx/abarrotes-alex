@@ -13,6 +13,7 @@
 - Promociones (semántica de vigencia, solapamiento, estados, zona horaria): [docs/promotions.md](docs/promotions.md)
 - Seguridad (amenazas, headers/CSP, límites de endpoints, secretos, PII, checklist de producción): [docs/security.md](docs/security.md)
 - Producción (inventario, datos del cliente, plan de limpieza, variables, go-live): [docs/production.md](docs/production.md)
+- Notificaciones de pedidos (PWA, Web Push, VAPID, Realtime, idempotencia): [docs/notifications.md](docs/notifications.md)
 - Pruebas: `npm test` (unitarias), `npm run test:db` (PGlite: migraciones, RLS, estados de
   pedidos, promociones) y `npm run test:e2e*` (navegador con sesión real). Ver
   [tests/README.md](tests/README.md). Solo datos sintéticos en pruebas versionadas.

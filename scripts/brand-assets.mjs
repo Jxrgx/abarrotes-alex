@@ -25,6 +25,16 @@ const resized = (px) => sharp(circle).resize(px, px, { kernel: "lanczos3" });
 // UI (header, panel, login): círculo con transparencia; next/image genera los tamaños.
 await resized(512).webp({ quality: 90, alphaQuality: 100, effort: 6 }).toFile("public/brand/logo.webp");
 
+// PWA del panel (public/admin.webmanifest): 192 y 512 "any" (círculo transparente) y
+// 512 "maskable": el círculo al 78 % sobre fondo blanco, dentro de la zona segura
+// (círculo de radio 40 %) para que Android pueda recortarlo sin cortar el texto.
+await resized(192).png({ compressionLevel: 9, palette: true }).toFile("public/brand/icon-192.png");
+await resized(512).png({ compressionLevel: 9, palette: true }).toFile("public/brand/icon-512.png");
+await sharp({ create: { width: 512, height: 512, channels: 4, background: "#ffffff" } })
+  .composite([{ input: await resized(400).png().toBuffer(), gravity: "center" }])
+  .png({ compressionLevel: 9, palette: true })
+  .toFile("public/brand/icon-maskable-512.png");
+
 // Ícono PNG para navegadores que piden más resolución que el .ico.
 await resized(192).png({ compressionLevel: 9, palette: true }).toFile("src/app/icon.png");
 
@@ -51,4 +61,4 @@ entries.forEach(({ px, png }, i) => {
 });
 writeFileSync("src/app/favicon.ico", Buffer.concat([header, ...entries.map((entry) => entry.png)]));
 
-console.log("Assets de marca generados: public/brand/logo.webp, src/app/{favicon.ico,icon.png,apple-icon.png}");
+console.log("Assets de marca generados: public/brand/{logo.webp,icon-192.png,icon-512.png,icon-maskable-512.png}, src/app/{favicon.ico,icon.png,apple-icon.png}");

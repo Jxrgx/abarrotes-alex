@@ -1,4 +1,7 @@
+import { after } from "next/server";
+
 import { ORDER_BODY_MAX_BYTES, readJsonBody } from "@/lib/http/json-body";
+import { dispatchNewOrderPush } from "@/lib/notifications/dispatch";
 import { createOrder } from "@/lib/orders/create-order";
 import { checkoutRequestSchema, type OrderError, type OrderErrorCode, orderError } from "@/lib/orders/schema";
 
@@ -50,6 +53,11 @@ export async function POST(request: Request) {
   try {
     const result = await createOrder(parsed.data);
     if (!result.ok) return errorResponse(result.error);
+    // Aviso al dueño DESPUÉS de responder: un fallo del push nunca afecta al pedido.
+    // También en reintentos (replayed): la base reclama el envío como máximo una vez
+    // por pedido, así que no se duplica y cubre el caso de una invocación que se cortó.
+    const orderId = result.order.orderId;
+    after(() => dispatchNewOrderPush(orderId));
     return Response.json(
       { order: result.order },
       { status: result.order.replayed ? 200 : 201, headers: NO_STORE },

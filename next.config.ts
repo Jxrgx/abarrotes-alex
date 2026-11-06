@@ -20,13 +20,15 @@ const supabaseHost = (() => {
 // En desarrollo se agregan 'unsafe-eval' y ws: (React/Turbopack los necesitan).
 const isDev = process.env.NODE_ENV === "development";
 const supabaseOrigin = supabaseHost.startsWith("*") ? "https://*.supabase.co" : `https://${supabaseHost}`;
+// Realtime (avisos de pedidos en el panel) usa WebSocket con el mismo host exacto.
+const supabaseRealtime = supabaseHost.startsWith("*") ? "wss://*.supabase.co" : `wss://${supabaseHost}`;
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${supabaseOrigin}`,
   "font-src 'self' data:",
-  `connect-src 'self' ${supabaseOrigin}${isDev ? " ws: wss:" : ""}`,
+  `connect-src 'self' ${supabaseOrigin} ${supabaseRealtime}${isDev ? " ws: wss:" : ""}`,
   "frame-ancestors 'none'",
   "frame-src 'none'",
   "object-src 'none'",
@@ -62,7 +64,11 @@ const nextConfig: NextConfig = {
     const headers = SEARCH_INDEXING_ENABLED
       ? securityHeaders
       : [...securityHeaders, { key: "X-Robots-Tag", value: "noindex, nofollow" }];
-    return [{ source: "/:path*", headers }];
+    return [
+      { source: "/:path*", headers },
+      // Service Worker de notificaciones: siempre la versión más reciente (sin caché HTTP).
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] },
+    ];
   },
   cacheComponents: true,
   partialPrefetching: true,

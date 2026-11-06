@@ -18,7 +18,7 @@ import { getBranchProducts } from "@/lib/catalog/products";
 export const metadata: Metadata = {
   title: { absolute: "Abarrotes Alex | Todo lo que necesitas, cerca de ti" },
   description:
-    "Explora bebidas, galletas, lácteos, botanas y artículos de limpieza de Abarrotes Alex y prepara tu pedido para enviarlo por WhatsApp.",
+    "Explora bebidas, galletas, lácteos, botanas y artículos de limpieza de Abarrotes Alex y haz tu pedido en línea.",
 };
 
 // Hero y FAQ son estáticos; el catálogo y la sucursal se consultan en cada visita.

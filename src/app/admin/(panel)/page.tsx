@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { AdminGuard } from "@/components/admin/admin-guard";
 import { DashboardError, DashboardSkeleton, DashboardView } from "@/components/admin/dashboard";
+import { NotificationsCard } from "@/components/admin/notifications-card";
 import { getAdminBranch, getDashboardData } from "@/lib/admin/dashboard";
 import { requireAdmin } from "@/lib/auth/session";
 import { branchShortName } from "@/lib/catalog/branches";
@@ -31,6 +32,7 @@ async function DashboardContent() {
         <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Hola{firstName ? `, ${firstName}` : ""}</h1>
         <p className="mt-1 text-sm text-muted-foreground">Este es el resumen de Abarrotes Alex.</p>
       </div>
+      <NotificationsCard />
       <Suspense fallback={<DashboardSkeleton />}>
         <DashboardSection />
       </Suspense>

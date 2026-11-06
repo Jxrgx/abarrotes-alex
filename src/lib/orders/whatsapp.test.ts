@@ -36,8 +36,9 @@ const contact = {
 describe("buildOrderWhatsAppMessage", () => {
   const message = buildOrderWhatsAppMessage(receipt, contact);
 
-  test("incluye el folio", () => {
-    assert.match(message, /^Hola, quiero realizar el pedido ALEX-000124\.$/m);
+  test("incluye el folio y es una consulta (el pedido ya está registrado)", () => {
+    assert.match(message, /^Hola, tengo una consulta sobre mi pedido ALEX-000124\.$/m);
+    assert.doesNotMatch(message, /quiero realizar/);
   });
 
   test("lista múltiples productos con importes del comprobante (incluida la promoción)", () => {

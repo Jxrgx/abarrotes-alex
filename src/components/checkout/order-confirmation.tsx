@@ -35,31 +35,30 @@ export function OrderConfirmation({ folio }: { folio: string }) {
         <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-success-soft">
           <CircleCheck className="size-8 text-success-strong" aria-hidden="true" />
         </span>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">¡Pedido confirmado!</h1>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">¡Pedido recibido!</h1>
         <p className="mt-2 text-muted-foreground">
           Folio <span className="font-semibold text-foreground tabular-nums">{receipt.folio}</span>
         </p>
+        {/* El pedido ya está registrado en la base: no depende de WhatsApp ni de que la
+            notificación al dueño llegue (Web Push no garantiza la entrega). */}
+        <p className="mx-auto mt-4 max-w-md text-base">
+          Tu pedido <span className="font-semibold tabular-nums">{receipt.folio}</span> fue enviado a Abarrotes Alex. En
+          breve será procesado. Conserva tu folio.
+        </p>
         {whatsappUrl && (
-          <p className="mx-auto mt-4 max-w-md text-base">
-            <span className="font-semibold">Último paso:</span> envíalo por WhatsApp a Abarrotes Alex para confirmar los
-            detalles con la tienda.
-          </p>
-        )}
-        {whatsappUrl ? (
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonVariants({ size: "lg", className: "mt-5 w-full sm:w-auto" })}
-          >
-            <MessageCircle aria-hidden="true" />
-            Enviar pedido por WhatsApp
-            <span className="sr-only"> (se abre en otra pestaña)</span>
-          </a>
-        ) : (
-          <p className="mt-5 text-sm text-muted-foreground">
-            Comunícate con la sucursal y menciona tu folio para confirmar tu pedido.
-          </p>
+          <div className="mt-5">
+            <p className="text-sm text-muted-foreground">¿Tienes alguna duda sobre tu pedido?</p>
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonVariants({ variant: "secondary", size: "lg", className: "mt-2 w-full sm:w-auto" })}
+            >
+              <MessageCircle aria-hidden="true" />
+              Contactar por WhatsApp
+              <span className="sr-only"> (se abre en otra pestaña)</span>
+            </a>
+          </div>
         )}
       </div>
 

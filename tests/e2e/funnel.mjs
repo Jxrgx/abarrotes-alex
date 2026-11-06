@@ -1,6 +1,6 @@
 // Recorrido de compra guiado (UX): inicio → Agregar → barra "Ver mi pedido" → carrito →
 // "Continuar pedido" → checkout por secciones (domicilio / recoger) → validaciones →
-// confirmación con "Enviar pedido por WhatsApp". SIN credenciales.
+// confirmación "¡Pedido recibido!" con WhatsApp como contacto opcional. SIN credenciales.
 //
 // SEGURIDAD DE DATOS: no se confirma ningún pedido. Toda petición a /api/pedidos se
 // aborta en el navegador (y se cuenta: debe ser 0). La confirmación usa un comprobante
@@ -56,7 +56,7 @@ try {
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
   await page.reload({ waitUntil: "networkidle0" });
   const hero = await page.evaluate(() => document.querySelector("#hero-title")?.closest("section")?.innerText.replace(/\s+/g, " ") ?? "");
-  check("hero explica el proceso: carrito → datos → WhatsApp", /Haz tu pedido fácil y rápido/.test(hero) && /carrito/.test(hero) && /datos/.test(hero) && /WhatsApp/.test(hero), hero);
+  check("hero explica el proceso: carrito → datos → confirmar (sin exigir WhatsApp)", /Haz tu pedido fácil y rápido/.test(hero) && /carrito/.test(hero) && /datos/.test(hero) && /confirma tu pedido/.test(hero) && !/WhatsApp/.test(hero), hero);
   check("beneficios visibles en móvil (domicilio, sucursal, efectivo)", await page.evaluate(() => ["Entrega a domicilio", "Recoge en sucursal", "Pago en efectivo"].every((t) => [...document.querySelectorAll("#hero-title ~ ul li, section ul li")].some((li) => li.checkVisibility() && li.textContent.includes(t)))));
   check("CTA principal «Ver productos»", await page.evaluate(() => [...document.querySelectorAll("main a")].some((a) => a.checkVisibility() && a.textContent.trim().startsWith("Ver productos"))));
   check("sin productos en el carrito no hay barra «Ver mi pedido»", (await bar(page)) === null);
@@ -135,7 +135,7 @@ try {
   check("entrega primero: pregunta visible como legend del grupo", await page.evaluate(() => { const l = document.querySelector("main form fieldset legend"); return l?.checkVisibility() && /¿Cómo quieres recibir tu pedido\?/.test(l.textContent); }));
   check("efectivo sin select de una sola opción", await page.evaluate(() => !document.querySelector("main form select") && /Efectivo/.test(document.querySelector("main form").innerText)));
   check("comentarios: indicaciones marcadas como opcionales", /Indicaciones para la tienda\s*\(opcional\)/.test(text));
-  check("junto al botón: «Después podrás enviarlo por WhatsApp a Abarrotes Alex.»", await page.evaluate(() => /Después podrás enviarlo por WhatsApp a Abarrotes Alex\./.test(document.getElementById("checkout-siguiente-paso")?.textContent ?? "") && document.querySelector("main form button[type=submit]")?.getAttribute("aria-describedby") === "checkout-siguiente-paso"));
+  check("junto al botón: «Tu pedido se envía directamente a Abarrotes Alex.» (sin exigir WhatsApp)", await page.evaluate(() => /Tu pedido se envía directamente a Abarrotes Alex\./.test(document.getElementById("checkout-siguiente-paso")?.textContent ?? "") && !/WhatsApp/.test(document.getElementById("checkout-siguiente-paso")?.textContent ?? "") && document.querySelector("main form button[type=submit]")?.getAttribute("aria-describedby") === "checkout-siguiente-paso"));
   await screenshot(page, "funnel-checkout-domicilio-390.png", { fullPage: true });
 
   // Domicilio a medio llenar (con datos inválidos) y después cambia a recoger.
@@ -235,11 +235,11 @@ try {
   const order = await page.evaluate(() => {
     const t = document.querySelector("main").innerText;
     const at = (s) => t.indexOf(s);
-    return { confirmed: at("¡Pedido confirmado!"), folio: at("ALEX-999999"), step: at("Último paso"), cta: at("Enviar pedido por WhatsApp"), detail: at("Detalle del pedido") };
+    return { received: at("¡Pedido recibido!"), folio: at("ALEX-999999"), sent: at("fue enviado a Abarrotes Alex"), keep: at("Conserva tu folio"), cta: at("Contactar por WhatsApp"), detail: at("Detalle del pedido"), oldCopy: /Enviar pedido por WhatsApp|Último paso|quiero realizar/.test(t) };
   });
-  check("confirmación: confirmado → folio → «Último paso» → WhatsApp → detalle", order.confirmed >= 0 && order.confirmed < order.folio && order.folio < order.step && order.step < order.cta && order.cta < order.detail, order);
-  const wa = await page.evaluate(() => { const a = document.querySelector("a[href^='https://wa.me/']"); const r = a?.getBoundingClientRect(); return a && { primary: a.className.includes("bg-primary"), aboveFold: r.bottom <= innerHeight }; });
-  check("«Enviar pedido por WhatsApp» es la acción principal y se ve sin desplazarse", wa?.primary && wa.aboveFold, wa);
+  check("confirmación: recibido → folio → «fue enviado a Abarrotes Alex» → contacto opcional → detalle", order.received >= 0 && order.received < order.folio && order.folio < order.sent && order.sent < order.keep && order.keep < order.cta && order.cta < order.detail && !order.oldCopy, order);
+  const wa = await page.evaluate(() => { const a = document.querySelector("a[href^='https://wa.me/']"); return a && { secondary: !a.className.includes("bg-primary "), text: decodeURIComponent(new URL(a.href).searchParams.get("text") ?? "") }; });
+  check("WhatsApp es secundario y el mensaje es una consulta sobre el pedido", wa?.secondary && /^Hola, tengo una consulta sobre mi pedido ALEX-999999./.test(wa.text), wa);
   check("WhatsApp no se abre solo (sigue en la confirmación)", new URL(page.url()).pathname === `/pedido/${MOCK_FOLIO}`);
   check("confirmación: sin barra «Ver mi pedido»", (await bar(page)) === null);
   await screenshot(page, "funnel-confirmacion-390.png", { fullPage: true });
