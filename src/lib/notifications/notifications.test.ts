@@ -219,6 +219,22 @@ describe("Service Worker", () => {
     assert.equal(sw.opened.length, 0);
   });
 
+  test("clic: si el sistema rechaza focus() (iOS), igual navega al pedido", async () => {
+    const panel = fakeClient("/admin", false);
+    panel.focus = () => Promise.reject(new Error("no permitido"));
+    const sw = loadServiceWorker([panel]);
+    await sw.dispatch("notificationclick", { notification: { close: () => {}, data: { path: `/admin/pedidos/${ORDER_ID}` } } });
+    assert.equal(panel.navigated, `https://abarrotes.test/admin/pedidos/${ORDER_ID}`);
+  });
+
+  test("clic: sin navigate() disponible → la app recibe { type: navigate } con la ruta interna", async () => {
+    const panel = fakeClient("/admin", false);
+    panel.navigate = () => Promise.reject(new TypeError("navigate no disponible"));
+    const sw = loadServiceWorker([panel]);
+    await sw.dispatch("notificationclick", { notification: { close: () => {}, data: { path: `/admin/pedidos/${ORDER_ID}` } } });
+    assert.deepEqual(plain(panel.messages), [{ type: "navigate", path: `/admin/pedidos/${ORDER_ID}` }]);
+  });
+
   test("clic con la app cerrada → abre /admin/pedidos/<id> (Auth decide si pide login)", async () => {
     const sw = loadServiceWorker([fakeClient("/productos", true)]);
     await sw.dispatch("notificationclick", { notification: { close: () => {}, data: { path: `/admin/pedidos/${ORDER_ID}` } } });

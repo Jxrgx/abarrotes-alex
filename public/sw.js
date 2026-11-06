@@ -72,11 +72,13 @@ self.addEventListener("notificationclick", (event) => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const existing = windows.find(isAdminWindow);
       if (existing) {
-        await existing.focus();
+        // Algunos sistemas (iOS) pueden rechazar focus(): la navegación sigue igual.
+        await existing.focus().catch(() => {});
         try {
           await existing.navigate(url);
         } catch {
-          // Ventana no controlada por este SW: la app navega al recibir el mensaje.
+          // Ventana no controlada por este SW o navigate() no disponible: la app
+          // navega al recibir el mensaje (y al volver a primer plano revalida datos).
           existing.postMessage({ type: "navigate", path });
         }
         return;

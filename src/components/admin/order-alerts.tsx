@@ -61,16 +61,49 @@ export function OrderAlerts() {
     void (async () => {
       await supabase.realtime.setAuth();
       if (cancelled) return;
+      let subscribedBefore = false;
       channel = supabase
         .channel("admin:orders", { config: { private: true } })
         .on("broadcast", { event: "order_created" }, ({ payload }) => handle(payload))
-        .subscribe();
+        .subscribe((status) => {
+          if (status !== "SUBSCRIBED") return;
+          // Reconexión (red, app suspendida): los mensajes perdidos no se reenvían, así
+          // que se vuelven a consultar los datos. La primera suscripción no lo necesita.
+          if (subscribedBefore) router.refresh();
+          subscribedBefore = true;
+        });
     })();
     return () => {
       cancelled = true;
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [handle]);
+  }, [handle, router]);
+
+  // Volver a primer plano: el sistema (iOS/Android) suspende la app y cierra la conexión
+  // en vivo; los pedidos que llegaron mientras tanto no generan aviso. Al volver se
+  // revalida el panel (un evento, no polling). bfcache (pageshow persisted): igual.
+  useEffect(() => {
+    let wasHidden = document.visibilityState === "hidden";
+    function onVisibility() {
+      if (document.visibilityState === "hidden") {
+        wasHidden = true;
+        return;
+      }
+      if (wasHidden) {
+        wasHidden = false;
+        router.refresh();
+      }
+    }
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) router.refresh();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [router]);
 
   // Service Worker: registro silencioso (no pide permisos) y mensajes del push.
   useEffect(() => {

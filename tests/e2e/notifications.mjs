@@ -93,6 +93,29 @@ try {
   check("fuera del panel: notificación del sistema con folio y total, sin datos personales", shown.length === 1 && shown[0].title === PUSH.title && shown[0].body === PUSH.body && shown[0].tag === PUSH.tag, shown);
   check("la notificación abre la ruta interna del pedido", shown[0]?.data?.path === `/admin/pedidos/${ORDER_ID}`, shown[0]?.data);
 
+  // App suspendida (segundo plano) → al volver a primer plano el panel pide datos frescos
+  // al servidor (RSC), aunque no haya llegado ningún aviso en vivo mientras tanto.
+  console.log("== Volver a primer plano revalida el panel");
+  await page.goto(`${BASE}/admin`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  let refreshes = 0;
+  const countRefresh = (request) => {
+    if (request.headers()["rsc"] === "1" && new URL(request.url()).pathname === "/admin") refreshes++;
+  };
+  page.on("request", countRefresh);
+  const setVisibility = (state) =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, "visibilityState", { value, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, state);
+  await setVisibility("hidden");
+  await sleep(300);
+  check("en segundo plano no se consulta nada (sin polling)", refreshes === 0, refreshes);
+  await setVisibility("visible");
+  await sleep(1500);
+  check(`al volver a primer plano se revalida el panel (${refreshes} petición/es)`, refreshes >= 1, refreshes);
+  page.off("request", countRefresh);
+
   const issues = relevantConsole().filter((issue) => !/Failed to load resource/.test(issue.text));
   check(`consola sin errores (${issues.length})`, issues.length === 0, issues.slice(0, 3));
   await ctx.close();

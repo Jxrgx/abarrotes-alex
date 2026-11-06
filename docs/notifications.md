@@ -52,7 +52,7 @@ cachea nada (panel, pedidos, Auth, APIs) y no hay modo offline. Se sirve con
   las ventanas del panel. Si no, `showNotification(título, { body, icon, tag, data.path })`.
 - **notificationclick**: solo rutas `/admin/pedidos/<uuid>` (validadas con regex; cualquier
   otra cosa → `/admin/pedidos`). Si hay una ventana del panel: `focus()` + `navigate()`
-  (o `postMessage({ type: "navigate" })` si no está controlada). Si no: `openWindow()`.
+  (o `postMessage({ type: "navigate" })` si no está controlada o `navigate()` no existe; un `focus()` rechazado por el sistema no impide navegar). Si no: `openWindow()`.
 - El registro lo hace el panel en silencio (`OrderAlerts`), sin pedir permisos.
 
 ## Activación por dispositivo (permiso)
@@ -139,6 +139,11 @@ exige sesión de admin).
   "Nuevo pedido ALEX-…" con "Ver pedido", `router.refresh()` (dashboard, lista y pendientes
   se vuelven a consultar con la sesión) y sonido.
 - Sin polling ni conexiones del lado del servidor: el WebSocket vive en el navegador.
+- **App suspendida**: iOS/Android cierran el WebSocket cuando la app pasa a segundo plano y
+  los Broadcast perdidos no se reenvían. Por eso el panel hace `router.refresh()` al volver a
+  primer plano (`visibilitychange` → visible, o `pageshow` desde bfcache) y cuando el canal se
+  vuelve a suscribir tras una reconexión. Son eventos, no polling: en segundo plano no se
+  consulta nada.
 - **Deduplicación**: por `order_id` (Realtime + mensaje del SW + reconexiones) → un aviso y un
   sonido por pedido. Solo la pestaña visible suena.
 - Sonido: dos tonos cortos (Web Audio, volumen bajo), solo después de una interacción con

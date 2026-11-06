@@ -36,7 +36,7 @@ export function DashboardView({ data, branchName }: { data: DashboardData; branc
         </ul>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Panel id="recientes-titulo" title="Pedidos recientes">
           {data.recent.length === 0 ? (
             <Empty>Aún no hay pedidos.</Empty>
@@ -193,7 +193,7 @@ export function DashboardSkeleton() {
           <div key={index} className="h-28 animate-pulse rounded-xl bg-muted" />
         ))}
       </div>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="h-80 animate-pulse rounded-xl bg-muted" />
         <div className="h-80 animate-pulse rounded-xl bg-muted" />
       </div>
