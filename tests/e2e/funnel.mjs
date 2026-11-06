@@ -11,6 +11,7 @@ import { BASE, check, launch, mainText, newPage, relevantConsole, screenshot, sl
 
 const MOCK_FOLIO = "ALEX-999999";
 let orderRequests = 0;
+let lastOrderBody = null;
 
 async function guard(page) {
   await page.setRequestInterception(true);
@@ -18,6 +19,7 @@ async function guard(page) {
     if (request.isInterceptResolutionHandled()) return;
     if (new URL(request.url()).pathname === "/api/pedidos") {
       orderRequests++;
+      lastOrderBody = JSON.parse(request.postData() ?? "null");
       return request.abort("failed");
     }
     return request.continue();
@@ -129,22 +131,71 @@ try {
   check("checkout móvil: arriba se recuerda cantidad y monto", /2 productos · \$[\d,.]+ \+ envío/.test(text), text.slice(0, 200));
   let h = await headings(page);
   check("domicilio: Entrega → Tus datos → Dirección → Pago → Comentarios", JSON.stringify(h.slice(0, 5)) === JSON.stringify(["Entrega", "Tus datos", "Dirección de entrega", "Pago", "Comentarios"]), h);
-  check("domicilio: pasos numerados 1–4", JSON.stringify(await stepNumbers(page)) === JSON.stringify(["1", "2", "3", "4"]), await stepNumbers(page));
+  check("domicilio: pasos numerados 1–5", JSON.stringify(await stepNumbers(page)) === JSON.stringify(["1", "2", "3", "4", "5"]), await stepNumbers(page));
   check("entrega primero: pregunta visible como legend del grupo", await page.evaluate(() => { const l = document.querySelector("main form fieldset legend"); return l?.checkVisibility() && /¿Cómo quieres recibir tu pedido\?/.test(l.textContent); }));
   check("efectivo sin select de una sola opción", await page.evaluate(() => !document.querySelector("main form select") && /Efectivo/.test(document.querySelector("main form").innerText)));
-  check("comentarios: indicaciones marcadas como opcionales, sin número de paso", /Indicaciones para la tienda\s*\(opcional\)/.test(text) && (await stepNumbers(page)).length === 4);
+  check("comentarios: indicaciones marcadas como opcionales", /Indicaciones para la tienda\s*\(opcional\)/.test(text));
   check("junto al botón: «Después podrás enviarlo por WhatsApp a Abarrotes Alex.»", await page.evaluate(() => /Después podrás enviarlo por WhatsApp a Abarrotes Alex\./.test(document.getElementById("checkout-siguiente-paso")?.textContent ?? "") && document.querySelector("main form button[type=submit]")?.getAttribute("aria-describedby") === "checkout-siguiente-paso"));
   await screenshot(page, "funnel-checkout-domicilio-390.png", { fullPage: true });
 
-  await page.evaluate(() => [...document.querySelectorAll("main input[type=radio]")].find((r) => r.value === "pickup")?.click());
+  // Domicilio a medio llenar (con datos inválidos) y después cambia a recoger.
+  const submitForm = () => page.evaluate(() => document.querySelector("main form button[type=submit]")?.click());
+  const choose = (type) => page.evaluate((t) => [...document.querySelectorAll("main input[type=radio]")].find((r) => r.value === t)?.click(), type);
+  const invalidIds = () => page.evaluate(() => [...document.querySelectorAll("main form [aria-invalid=true]")].map((e) => e.id));
+  await page.type("#checkout-telefono", "12");
+  await page.type("#checkout-direccion", "Calle Sintética 1");
+  await page.type("#checkout-efectivo", "cien");
+  await page.type("#checkout-notas", "Nota de domicilio");
+  await submitForm();
+  await sleep(500);
+  const deliveryErrors = await invalidIds();
+  check("domicilio con datos inválidos → errores en teléfono y efectivo", deliveryErrors.includes("checkout-telefono") && deliveryErrors.includes("checkout-efectivo"), deliveryErrors);
+  const requestsBefore = orderRequests;
+
+  await choose("pickup");
   await sleep(300);
   h = await headings(page);
   text = await mainText(page);
-  check("recoger: sin sección ni campos de dirección", !h.includes("Dirección de entrega") && !(await page.evaluate(() => Boolean(document.querySelector("#checkout-direccion")))), h);
-  check("recoger: muestra dónde recoger (sucursal, dirección y horario)", /Recoges tu pedido en/.test(text) && /Calle 24|Concepci|Champot/.test(text) && /a\. m\.|p\. m\./.test(text), text.slice(0, 400));
-  check("recoger: pasos renumerados 1–3", JSON.stringify(await stepNumbers(page)) === JSON.stringify(["1", "2", "3"]), await stepNumbers(page));
+  check("recoger: solo «Entrega» y «Tus datos»", JSON.stringify(h.slice(0, 2)) === JSON.stringify(["Entrega", "Tus datos"]) && !h.some((x) => /Dirección|Pago|Comentarios/.test(x)), h);
+  check("recoger: nombre y teléfono; sin dirección, efectivo ni comentarios en pantalla", await page.evaluate(() => Boolean(document.querySelector("#checkout-nombre")) && Boolean(document.querySelector("#checkout-telefono")) && ["#checkout-direccion", "#checkout-colonia", "#checkout-referencias", "#checkout-efectivo", "#checkout-notas"].every((sel) => !document.querySelector(sel))));
+  check("recoger: pasos 1–2, sin saltos", JSON.stringify(await stepNumbers(page)) === JSON.stringify(["1", "2"]), await stepNumbers(page));
+  check("recoger: sin errores de los campos que ya no existen (el teléfono sigue validándose)", (await invalidIds()).every((id) => id === "checkout-nombre" || id === "checkout-telefono"), await invalidIds());
+  check("recoger: Entrega muestra sucursal, dirección y horario", /Recoges tu pedido en/.test(text) && /Calle 24|Concepci|Champot/.test(text) && /a\. m\.|p\. m\./.test(text), text.slice(0, 400));
+  check("recoger: el resumen indica dónde recoger (sucursal, dirección y horario)", await page.evaluate(() => { const t = document.getElementById("checkout-resumen")?.closest("section")?.innerText ?? ""; return /Recoger en/.test(t) && /Dirección/.test(t) && /Horario/.test(t) && !/Teléfono|Paga con|Cambio|Comentarios/.test(t); }));
+  check("recoger: sin «¿Con cuánto pagarás?» ni cambio aproximado", !/Con cuánto pagarás|Cambio aproximado/.test(text));
   await screenshot(page, "funnel-checkout-recoger-390.png", { fullPage: true });
+  await page.type("#checkout-nombre", "Ana Recoge");
+  await page.click("#checkout-telefono", { clickCount: 3 });
+  await page.type("#checkout-telefono", "5500000000");
+  await submitForm();
+  await sleep(800);
+  check(
+    "recoger: el pedido se envía con nombre y teléfono, sin domicilio, efectivo ni notas (interceptado)",
+    orderRequests === requestsBefore + 1 &&
+      lastOrderBody &&
+      JSON.stringify(Object.keys(lastOrderBody.customer)) === JSON.stringify(["name", "phone"]) &&
+      lastOrderBody.customer.name === "Ana Recoge" &&
+      lastOrderBody.customer.phone === "5500000000" &&
+      JSON.stringify(lastOrderBody.delivery) === JSON.stringify({ type: "pickup" }) &&
+      JSON.stringify(lastOrderBody.payment) === JSON.stringify({ method: "cash" }) &&
+      !("notes" in lastOrderBody),
+    lastOrderBody,
+  );
+  check("recoger: nada de lo escrito para domicilio viaja en el pedido", !/Calle Sintética|Nota de domicilio|cien/.test(JSON.stringify(lastOrderBody)));
 
+  await choose("delivery");
+  await sleep(300);
+  const back = await page.evaluate(() => ({ phone: document.querySelector("#checkout-telefono")?.value, address: document.querySelector("#checkout-direccion")?.value, cash: Boolean(document.querySelector("#checkout-efectivo")), notes: Boolean(document.querySelector("#checkout-notas")) }));
+  check("volver a domicilio: reaparecen dirección, pago y comentarios con lo escrito", back.phone === "5500000000" && back.address === "Calle Sintética 1" && back.cash && back.notes, back);
+  check("volver a domicilio: sin errores antes de enviar", (await invalidIds()).length === 0, await invalidIds());
+  check("volver a domicilio: pasos 1–5", JSON.stringify(await stepNumbers(page)) === JSON.stringify(["1", "2", "3", "4", "5"]), await stepNumbers(page));
+  await submitForm();
+  await sleep(500);
+  check("volver a domicilio: al enviar se vuelven a validar (efectivo inválido)", (await invalidIds()).includes("checkout-efectivo"), await invalidIds());
+
+  // Formulario limpio para el resto del recorrido de domicilio.
+  await page.reload({ waitUntil: "networkidle0" });
+  await page.waitForSelector("#checkout-nombre", { timeout: 15000 });
   await page.evaluate(() => [...document.querySelectorAll("main input[type=radio]")].find((r) => r.value === "delivery")?.click());
   await sleep(300);
   await page.evaluate(() => document.querySelector("main form button[type=submit]")?.click());
@@ -193,8 +244,23 @@ try {
   check("confirmación: sin barra «Ver mi pedido»", (await bar(page)) === null);
   await screenshot(page, "funnel-confirmacion-390.png", { fullPage: true });
 
-  check(`ninguna petición a /api/pedidos (${orderRequests})`, orderRequests === 0);
-  const issues = relevantConsole();
+  // Pedido para recoger sin teléfono, efectivo ni notas (comprobante sintético).
+  const PICKUP_FOLIO = "ALEX-999998";
+  await page.evaluate((folio) => {
+    const all = JSON.parse(sessionStorage.getItem("abarrotes-alex:order-confirmations") ?? "{}");
+    const receipt = { orderId: "00000000-0000-4000-8000-000000000998", folio, status: "new", createdAt: new Date().toISOString(), deliveryType: "pickup", paymentMethod: "cash", subtotalCents: 1500, shippingCents: null, totalCents: 1500, replayed: false, branch: { name: "Sucursal Sintética", whatsappNumber: "5215500000000" }, items: [{ productId: "00000000-0000-4000-8000-000000000001", name: "Agua natural", presentation: "1.5 L", unitPriceCents: 1500, quantity: 1, subtotalCents: 1500 }] };
+    all[folio] = { receipt, contact: { name: "Ana Recoge" }, savedAt: Date.now() };
+    sessionStorage.setItem("abarrotes-alex:order-confirmations", JSON.stringify(all));
+  }, PICKUP_FOLIO);
+  await page.goto(`${BASE}/pedido/${PICKUP_FOLIO}`, { waitUntil: "networkidle0" });
+  text = await mainText(page);
+  const pickupWa = await page.evaluate(() => decodeURIComponent(new URL(document.querySelector("a[href^='https://wa.me/']")?.href ?? "https://x").searchParams.get("text") ?? ""));
+  check("confirmación recoger: «Recoger en sucursal» y «Efectivo al recoger», sin datos vacíos", /Recoger en sucursal/.test(text) && /Efectivo al recoger/.test(text) && !/Pagarás con|Comentarios|—|undefined|null/.test(text), text.slice(0, 300));
+  check("WhatsApp recoger: nombre y sucursal, sin dirección, «Pagaré con» ni comentarios", /Recoger en sucursal: Sucursal Sintética/.test(pickupWa) && /Nombre: Ana Recoge/.test(pickupWa) && /Efectivo al recoger/.test(pickupWa) && !/Teléfono|Dirección|Pagaré con|COMENTARIOS|undefined/.test(pickupWa), pickupWa);
+
+  check(`ninguna petición a /api/pedidos llegó al servidor (${orderRequests} interceptada y abortada: la de recoger)`, orderRequests === 1);
+  // El aborto intencional de /api/pedidos (pedido para recoger) registra un net::ERR_FAILED esperado.
+  const issues = relevantConsole().filter((issue) => !/Failed to load resource: net::ERR_FAILED/.test(issue.text));
   check(`consola sin errores (${issues.length})`, issues.length === 0, issues.slice(0, 3));
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
   await ctx.close();

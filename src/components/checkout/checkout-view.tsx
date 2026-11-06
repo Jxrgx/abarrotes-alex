@@ -21,6 +21,7 @@ import {
   buildCheckoutRequest,
   cartFingerprint,
   type CheckoutFormValues,
+  DELIVERY_ONLY_FIELDS,
   EMPTY_CHECKOUT_FORM,
   makeCheckoutFormSchema,
   NOTES_MAX_LENGTH,
@@ -152,7 +153,7 @@ function CheckoutForm({
     defaultValues: EMPTY_CHECKOUT_FORM,
     mode: "onTouched",
   });
-  const { register, formState, setError, control } = form;
+  const { register, formState, setError, clearErrors, control } = form;
   const errors = formState.errors;
   const [deliveryType, cashAmount, notes] = useWatch({ control, name: ["deliveryType", "cashAmount", "notes"] });
 
@@ -268,10 +269,19 @@ function CheckoutForm({
     void form.handleSubmit(submit)(event);
   }
 
-  // Orientación, no navegación: los pasos se numeran según la entrega elegida
-  // (con "Recoger en sucursal" no hay paso de dirección).
-  const steps = deliveryType === "delivery" ? ["delivery", "contact", "address", "payment"] : ["delivery", "contact", "payment"];
+  const delivering = deliveryType === "delivery";
+  // Orientación, no navegación: los pasos se numeran según la entrega elegida.
+  // Recoger es el flujo más corto: solo Entrega y Tus datos (nombre y teléfono).
+  const steps = delivering ? ["delivery", "contact", "address", "payment", "comments"] : ["delivery", "contact"];
   const stepOf = (key: string) => steps.indexOf(key) + 1;
+  // Al cambiar a recoger se quitan los errores de los campos que dejan de existir. Lo
+  // escrito se conserva en el formulario por si vuelve a domicilio, pero nunca se envía
+  // en un pedido para recoger (buildCheckoutRequest).
+  const deliveryTypeField = register("deliveryType", {
+    onChange: (event: { target: { value: string } }) => {
+      if (event.target.value === "pickup") clearErrors([...DELIVERY_ONLY_FIELDS]);
+    },
+  });
 
   return (
     <form
@@ -295,14 +305,14 @@ function CheckoutForm({
                 title="Entrega a domicilio"
                 description="Te lo llevamos. La tienda te confirma el costo de envío."
                 checked={deliveryType === "delivery"}
-                input={<input type="radio" value="delivery" className="size-4 accent-primary" {...register("deliveryType")} />}
+                input={<input type="radio" value="delivery" className="size-4 accent-primary" {...deliveryTypeField} />}
               />
               <ChoiceCard
                 icon={Store}
                 title="Recoger en sucursal"
                 description="Pasa por tu pedido sin costo de envío."
                 checked={deliveryType === "pickup"}
-                input={<input type="radio" value="pickup" className="size-4 accent-primary" {...register("deliveryType")} />}
+                input={<input type="radio" value="pickup" className="size-4 accent-primary" {...deliveryTypeField} />}
               />
             </div>
           </fieldset>
@@ -349,7 +359,7 @@ function CheckoutForm({
           </div>
         </Section>
 
-        {deliveryType === "delivery" && (
+        {delivering && (
           <Section step={stepOf("address")} title="Dirección de entrega">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="checkout-direccion" label="Dirección" required className="sm:col-span-2" hint="Calle, número exterior e interior." error={errors.address?.message}>
@@ -394,13 +404,16 @@ function CheckoutForm({
           </Section>
         )}
 
+        {/* Recoger: sin pago ni comentarios (paga en efectivo al recoger). */}
+        {delivering && (
+        <>
         <Section step={stepOf("payment")} title="Pago">
           <p className="flex items-start gap-2 text-sm">
             <Banknote className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
             <span>
               <span className="font-medium">Efectivo.</span>{" "}
               <span className="text-muted-foreground">
-                Pagas al {deliveryType === "delivery" ? "recibir" : "recoger"} tu pedido.
+                Pagas al recibir tu pedido.
               </span>
             </span>
           </p>
@@ -431,15 +444,10 @@ function CheckoutForm({
           </Field>
         </Section>
 
-        {/* Opcional (la etiqueta lo indica): sin número ni tarjeta, para no competir con los pasos obligatorios. */}
-        <section aria-labelledby="checkout-comentarios" className="px-1">
-          <h2 id="checkout-comentarios" className="text-base font-medium">
-            Comentarios
-          </h2>
+        <Section step={stepOf("comments")} title="Comentarios">
           <Field
             id="checkout-notas"
             label="Indicaciones para la tienda"
-            className="mt-2"
             hint={`${notes.length}/${NOTES_MAX_LENGTH} caracteres`}
             error={errors.notes?.message}
           >
@@ -454,10 +462,12 @@ function CheckoutForm({
               {...register("notes")}
             />
           </Field>
-        </section>
+        </Section>
+        </>
+        )}
       </div>
 
-      <CheckoutSummary summary={summary} refreshing={refreshing}>
+      <CheckoutSummary summary={summary} refreshing={refreshing} pickupBranch={delivering ? null : pickupBranch}>
         <StatusMessage status={status} summary={summary} onRetry={() => onSubmit()} />
         <Button
           type="submit"
@@ -566,10 +576,13 @@ function StatusMessage({
 function CheckoutSummary({
   summary,
   refreshing,
+  pickupBranch,
   children,
 }: {
   summary: ReturnType<typeof resolveCartLines>;
   refreshing: boolean;
+  /** Solo con "Recoger en sucursal": dónde y cuándo recoger. */
+  pickupBranch: PickupBranch | null;
   children: ReactNode;
 }) {
   return (
@@ -623,6 +636,33 @@ function CheckoutSummary({
         </div>
       </dl>
       <p className="mt-1 text-xs text-subtle-foreground">El envío se suma cuando la sucursal lo confirme.</p>
+
+      {pickupBranch && (
+        <dl className="mt-3 space-y-1 border-t pt-3 text-sm">
+          <div>
+            <dt className="text-muted-foreground">Recoger en</dt>
+            <dd className="font-medium">{pickupBranch.name}</dd>
+          </div>
+          {pickupBranch.address && (
+            <div>
+              <dt className="text-muted-foreground">Dirección</dt>
+              <dd>{pickupBranch.address}</dd>
+            </div>
+          )}
+          {pickupBranch.hours.length > 0 && (
+            <div>
+              <dt className="text-muted-foreground">Horario</dt>
+              <dd>
+                {pickupBranch.hours.map((group) => (
+                  <span key={group.days} className="block tabular-nums">
+                    {group.days}: {group.hours}
+                  </span>
+                ))}
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
 
       {children}
     </section>

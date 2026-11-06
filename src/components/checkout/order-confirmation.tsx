@@ -91,7 +91,7 @@ export function OrderConfirmation({ folio }: { folio: string }) {
           <div>
             <dt className="text-muted-foreground">Pago</dt>
             <dd className="mt-0.5 font-medium">
-              Efectivo
+              {receipt.deliveryType === "pickup" ? "Efectivo al recoger" : "Efectivo"}
               {contact.cashAmountCents ? (
                 <span className="block font-normal text-muted-foreground">
                   Pagarás con {formatCents(contact.cashAmountCents)}

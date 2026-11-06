@@ -82,6 +82,19 @@ describe("makeCheckoutFormSchema", () => {
   test("recoger en sucursal no exige dirección", () => {
     assert.deepEqual(errorsOf({ deliveryType: "pickup", address: "", neighborhood: "" }), {});
   });
+  test("recoger mínimo: solo nombre y teléfono son obligatorios", () => {
+    assert.deepEqual(errorsOf({ ...EMPTY_CHECKOUT_FORM, deliveryType: "pickup", name: "Ana", phone: "5512345678" }), {});
+    assert.deepEqual(Object.keys(errorsOf({ ...EMPTY_CHECKOUT_FORM, deliveryType: "pickup" })).sort(), ["name", "phone"]);
+  });
+  test("recoger: lo que quedó escrito de domicilio (aunque sea inválido) no genera errores ocultos", () => {
+    const errors = errorsOf({ deliveryType: "pickup", address: "", cashAmount: "cien", notes: "x".repeat(501), references: "x".repeat(301) });
+    assert.deepEqual(errors, {});
+  });
+  test("teléfono obligatorio en ambos tipos de entrega", () => {
+    assert.equal(errorsOf({ phone: "" }).phone, "Escribe tu teléfono.");
+    assert.equal(errorsOf({ deliveryType: "pickup", phone: "" }).phone, "Escribe tu teléfono.");
+    assert.equal(errorsOf({ deliveryType: "pickup", phone: "12" }).phone, "Escribe un teléfono de 10 dígitos.");
+  });
   test("efectivo opcional", () => {
     assert.deepEqual(errorsOf({ cashAmount: "" }), {});
     assert.deepEqual(errorsOf({ cashAmount: "$100" }), {});
@@ -114,10 +127,24 @@ describe("buildCheckoutRequest", () => {
     assert.ok(checkoutRequestSchema.safeParse(body).success);
   });
 
-  test("recoger en sucursal: no envía datos de domicilio", () => {
-    const body = buildCheckoutRequest({ ...valid, deliveryType: "pickup" }, context);
+  test("recoger en sucursal: nombre y teléfono; nada de domicilio, efectivo ni notas", () => {
+    // El cliente llenó domicilio completo y después cambió a recoger.
+    const body = buildCheckoutRequest({ ...valid, deliveryType: "pickup", cashAmount: "$500", notes: "Tocar timbre", references: "Portón" }, context);
+    assert.deepEqual(body.customer, { name: "José Peña", phone: "5512345678" });
     assert.deepEqual(body.delivery, { type: "pickup" });
-    assert.doesNotMatch(JSON.stringify(body), /Calle 1|Centro/);
+    assert.deepEqual(body.payment, { method: "cash" });
+    assert.equal("notes" in body, false);
+    assert.doesNotMatch(JSON.stringify(body), /Calle 1|Centro|50000|Tocar timbre|Portón/);
+    assert.ok(checkoutRequestSchema.safeParse(body).success);
+  });
+
+  test("servidor: sin teléfono → inválido en customer.phone, a domicilio y al recoger", () => {
+    for (const deliveryType of ["delivery", "pickup"] as const) {
+      const body = buildCheckoutRequest({ ...valid, deliveryType }, context);
+      const result = checkoutRequestSchema.safeParse({ ...body, customer: { name: body.customer.name } });
+      assert.equal(result.success, false, deliveryType);
+      assert.deepEqual(result.error?.issues.map((issue) => issue.path.join(".")), ["customer.phone"], deliveryType);
+    }
   });
 
   test("no envía precios como autoridad", () => {

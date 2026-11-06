@@ -17,18 +17,18 @@ La creación del pedido (validación, precios, folio, atomicidad) está en
 
 ## Formulario
 
-Una sola página con secciones numeradas que orientan, sin bloquear ni navegar: **1 Entrega** (primero: "¿Cómo quieres recibir tu pedido?") → **2 Tus datos** → **3 Dirección de entrega** (solo con domicilio) → **Pago** (3 o 4 según la entrega). **Comentarios** va al final, sin número ni tarjeta (es opcional). En móvil, arriba se recuerda "N productos · $X + envío · Editar"; el resumen completo y "Confirmar pedido" quedan al final, con la nota "Después podrás enviarlo por WhatsApp a Abarrotes Alex." (asociada al botón con `aria-describedby`). Los campos tienen `scroll-margin-top` para que, al enfocar un error, no queden bajo el header fijo. WhatsApp nunca se abre solo: es la acción principal de la confirmación ("Último paso").
+Una sola página con secciones numeradas que orientan, sin bloquear ni navegar. **Domicilio**: 1 Entrega → 2 Tus datos (nombre y teléfono) → 3 Dirección de entrega → 4 Pago → 5 Comentarios. **Recoger en sucursal** (el flujo más corto): 1 Entrega (con sucursal, dirección y horario) → 2 Tus datos (nombre y teléfono) → resumen (con "Recoger en", dirección y horario) → Confirmar pedido. Sin dirección, pago ni comentarios. Al cambiar a recoger se limpian los errores de esos campos (`DELIVERY_ONLY_FIELDS`); lo escrito se conserva por si vuelve a domicilio, pero **nunca se envía** en un pedido para recoger. En móvil, arriba se recuerda "N productos · $X + envío · Editar"; el resumen completo y "Confirmar pedido" quedan al final, con la nota "Después podrás enviarlo por WhatsApp a Abarrotes Alex." (asociada al botón con `aria-describedby`). Los campos tienen `scroll-margin-top` para que, al enfocar un error, no queden bajo el header fijo. WhatsApp nunca se abre solo: es la acción principal de la confirmación ("Último paso").
 
 | Campo | Regla (cliente) | Notas |
 | --- | --- | --- |
 | Nombre * | 2–120 caracteres | `autocomplete="name"` |
-| Teléfono * | 10 dígitos MX; acepta espacios, guiones, `+52`/`521` | Se envía normalizado a 10 dígitos. `type="tel"` |
+| Teléfono * | 10 dígitos MX (también al recoger); acepta espacios, guiones, `+52`/`521` | Se envía normalizado a 10 dígitos. `type="tel"` |
 | Tipo de entrega * | Domicilio (default) o Recoger | Radios accesibles en tarjetas |
 | Dirección * / Colonia * | Obligatorias con domicilio (≤300 / ≤120) | `address-line1`, `address-level3` |
 | Referencias | Opcional, ≤300 | |
-| Pago | Solo efectivo, sin opciones deshabilitadas | "El pago se realiza al recibir o recoger tu pedido." |
-| ¿Con cuánto pagarás? | Opcional; `$500`, `1,250.50`…; ≥ total parcial | `inputMode="decimal"`; muestra "Cambio aproximado" (solo UX) |
-| Indicaciones adicionales | Opcional, ≤500 con contador | No es un mecanismo de sustitución automática |
+| Pago | Solo a domicilio: efectivo, sin opciones deshabilitadas | Al recoger no se muestra; el pedido va como `cash` ("Efectivo al recoger" en confirmación y WhatsApp) |
+| ¿Con cuánto pagarás? | Solo a domicilio. Opcional; `$500`, `1,250.50`…; ≥ total parcial | `inputMode="decimal"`; muestra "Cambio aproximado" (solo UX) |
+| Indicaciones para la tienda | Solo a domicilio. Opcional, ≤500 con contador | No es un mecanismo de sustitución automática |
 
 Con "Recoger en sucursal" los campos de domicilio se ocultan y **no se envían**; se
 muestra la sucursal, su dirección y horario. Los datos del formulario no se guardan

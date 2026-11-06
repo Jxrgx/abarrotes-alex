@@ -50,10 +50,12 @@ export function buildOrderWhatsAppMessage(receipt: OrderReceipt, contact: OrderC
     lines.push(`Nombre: ${singleLine(contact.name)}`);
   }
 
-  lines.push("", "*PAGO*", "Efectivo");
-  if (contact.cashAmountCents) lines.push(`Pagaré con: ${formatCents(contact.cashAmountCents)}`);
+  // Recoger: se paga en efectivo al recoger; no se pregunta con cuánto ni hay comentarios.
+  const delivering = receipt.deliveryType === "delivery";
+  lines.push("", "*PAGO*", delivering ? "Efectivo" : "Efectivo al recoger");
+  if (delivering && contact.cashAmountCents) lines.push(`Pagaré con: ${formatCents(contact.cashAmountCents)}`);
 
-  const notes = contact.notes?.trim();
+  const notes = delivering ? contact.notes?.trim() : undefined;
   if (notes) {
     // Los comentarios conservan sus saltos de línea (normalizados).
     lines.push("", "*COMENTARIOS*", notes.replace(/\r\n?/g, "\n"));

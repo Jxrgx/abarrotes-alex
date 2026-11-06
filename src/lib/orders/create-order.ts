@@ -25,6 +25,10 @@ export async function createOrder(input: CheckoutRequest): Promise<CreateOrderRe
   }
 
   const delivery = input.delivery;
+  // Recoger en sucursal: se piden nombre y teléfono. Aunque el request traiga efectivo o
+  // notas (cliente manipulado), NO se envían a la base: quedan NULL. (La dirección ya se descarta.)
+  // El pago sigue siendo "cash" (en efectivo al recoger), sin pedir con cuánto.
+  const delivering = delivery.type === "delivery";
   // create_order no depende de la identidad del usuario: siempre se invoca como
   // anon (cliente público, sin cookies). Su seguridad está en la propia función.
   const supabase = getPublicSupabase();
@@ -36,11 +40,11 @@ export async function createOrder(input: CheckoutRequest): Promise<CreateOrderRe
     p_customer_phone: input.customer.phone,
     p_delivery_type: delivery.type,
     p_payment_method: input.payment.method,
-    p_address: delivery.type === "delivery" ? delivery.address : undefined,
-    p_neighborhood: delivery.type === "delivery" ? delivery.neighborhood : undefined,
-    p_address_references: delivery.type === "delivery" ? delivery.references : undefined,
-    p_cash_amount: centsToNumeric(input.payment.cashAmountCents),
-    p_customer_notes: input.notes,
+    p_address: delivering ? delivery.address : undefined,
+    p_neighborhood: delivering ? delivery.neighborhood : undefined,
+    p_address_references: delivering ? delivery.references : undefined,
+    p_cash_amount: delivering ? centsToNumeric(input.payment.cashAmountCents) : undefined,
+    p_customer_notes: delivering ? input.notes : undefined,
     p_expected_subtotal: centsToNumeric(input.expectedSubtotalCents),
   });
 

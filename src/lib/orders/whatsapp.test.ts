@@ -81,6 +81,21 @@ describe("buildOrderWhatsAppMessage", () => {
     assert.doesNotMatch(pickup, /Dirección|No debe salir|COMENTARIOS|Pagaré con/);
   });
 
+  test("recoger mínimo (solo nombre): sin teléfono, dirección, «Pagaré con» ni comentarios", () => {
+    const pickup = buildOrderWhatsAppMessage({ ...receipt, deliveryType: "pickup" }, { name: "Ana" });
+    assert.match(pickup, /ALEX-000124/);
+    assert.match(pickup, /^Recoger en sucursal: Abarrotes Alex - Sucursal Principal$/m);
+    assert.match(pickup, /^Nombre: Ana$/m);
+    assert.match(pickup, /^\*PAGO\*\nEfectivo al recoger$/m);
+    assert.match(pickup, /Subtotal: \$/);
+    assert.doesNotMatch(pickup, /Teléfono|Dirección|Colonia|Referencias|Pagaré con|COMENTARIOS|undefined|null/);
+  });
+
+  test("recoger: aunque el contacto traiga efectivo o notas, no se incluyen", () => {
+    const pickup = buildOrderWhatsAppMessage({ ...receipt, deliveryType: "pickup" }, { name: "Ana", cashAmountCents: 50000, notes: "Nota" });
+    assert.doesNotMatch(pickup, /Pagaré con|COMENTARIOS|Nota/);
+  });
+
   test("un salto de línea en la dirección no rompe el formato", () => {
     const text = buildOrderWhatsAppMessage(receipt, { ...contact, address: "Calle 1\r\nCasa azul" });
     assert.match(text, /^Dirección: Calle 1 Casa azul$/m);

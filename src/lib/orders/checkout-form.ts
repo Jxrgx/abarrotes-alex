@@ -32,7 +32,14 @@ export function parseMoneyToCents(input: string): number | null {
 
 const required = (message: string) => z.string().trim().min(1, message);
 
+// Campos que solo existen a domicilio. Con "Recoger en sucursal" no se muestran, no se
+// validan y NUNCA se envían (aunque React Hook Form conserve lo escrito por si el
+// cliente vuelve a domicilio).
+export const DELIVERY_ONLY_FIELDS = ["address", "neighborhood", "references", "cashAmount", "notes"] as const;
+
 // El efectivo depende del subtotal actual, por eso el esquema se crea con él.
+// Siempre: nombre y teléfono obligatorios. Domicilio: además dirección y colonia;
+// referencias, efectivo y notas opcionales. Recoger: solo nombre y teléfono.
 export function makeCheckoutFormSchema(subtotalCents: number) {
   return z
     .object({
@@ -47,22 +54,24 @@ export function makeCheckoutFormSchema(subtotalCents: number) {
       neighborhood: z.string(),
       references: z.string(),
       cashAmount: z.string(),
-      notes: z.string().max(NOTES_MAX_LENGTH, `Usa máximo ${NOTES_MAX_LENGTH} caracteres.`),
+      notes: z.string(),
     })
     .superRefine((values, context) => {
-      if (values.deliveryType === "delivery") {
-        const address = values.address.trim();
-        const neighborhood = values.neighborhood.trim();
-        if (!address) context.addIssue({ code: "custom", path: ["address"], message: "Escribe tu dirección." });
-        else if (address.length > 300)
-          context.addIssue({ code: "custom", path: ["address"], message: "Usa máximo 300 caracteres." });
-        if (!neighborhood)
-          context.addIssue({ code: "custom", path: ["neighborhood"], message: "Escribe tu colonia." });
-        else if (neighborhood.length > 120)
-          context.addIssue({ code: "custom", path: ["neighborhood"], message: "Usa máximo 120 caracteres." });
-        if (values.references.trim().length > 300)
-          context.addIssue({ code: "custom", path: ["references"], message: "Usa máximo 300 caracteres." });
-      }
+      if (values.deliveryType !== "delivery") return;
+
+      if (values.notes.length > NOTES_MAX_LENGTH)
+        context.addIssue({ code: "custom", path: ["notes"], message: `Usa máximo ${NOTES_MAX_LENGTH} caracteres.` });
+
+      const address = values.address.trim();
+      const neighborhood = values.neighborhood.trim();
+      if (!address) context.addIssue({ code: "custom", path: ["address"], message: "Escribe tu dirección." });
+      else if (address.length > 300)
+        context.addIssue({ code: "custom", path: ["address"], message: "Usa máximo 300 caracteres." });
+      if (!neighborhood) context.addIssue({ code: "custom", path: ["neighborhood"], message: "Escribe tu colonia." });
+      else if (neighborhood.length > 120)
+        context.addIssue({ code: "custom", path: ["neighborhood"], message: "Usa máximo 120 caracteres." });
+      if (values.references.trim().length > 300)
+        context.addIssue({ code: "custom", path: ["references"], message: "Usa máximo 300 caracteres." });
 
       if (values.cashAmount.trim()) {
         const cents = parseMoneyToCents(values.cashAmount);
@@ -106,25 +115,38 @@ export function buildCheckoutRequest(
     expectedSubtotalCents: number;
   },
 ): CheckoutRequestBody {
-  const cashAmountCents = values.cashAmount.trim() ? parseMoneyToCents(values.cashAmount) : null;
-  const notes = values.notes.trim();
-  return {
+  const base = {
     clientRequestId: context.clientRequestId,
     branchId: context.branchId,
     items: context.items.map(({ productId, quantity }) => ({ productId, quantity })),
-    customer: { name: values.name.trim(), phone: normalizeMxPhone(values.phone) ?? values.phone },
-    delivery:
-      values.deliveryType === "delivery"
-        ? {
-            type: "delivery",
-            address: values.address.trim(),
-            neighborhood: values.neighborhood.trim(),
-            references: values.references.trim() || undefined,
-          }
-        : { type: "pickup" },
+    expectedSubtotalCents: context.expectedSubtotalCents,
+  };
+
+  const customer = { name: values.name.trim(), phone: normalizeMxPhone(values.phone) ?? values.phone };
+
+  // Recoger: nombre y teléfono. Pago en efectivo al recoger (sin "con cuánto"), sin notas.
+  if (values.deliveryType === "pickup") {
+    return {
+      ...base,
+      customer,
+      delivery: { type: "pickup" },
+      payment: { method: "cash" },
+    };
+  }
+
+  const cashAmountCents = values.cashAmount.trim() ? parseMoneyToCents(values.cashAmount) : null;
+  const notes = values.notes.trim();
+  return {
+    ...base,
+    customer,
+    delivery: {
+      type: "delivery",
+      address: values.address.trim(),
+      neighborhood: values.neighborhood.trim(),
+      references: values.references.trim() || undefined,
+    },
     payment: { method: "cash", cashAmountCents: cashAmountCents ?? undefined },
     notes: notes || undefined,
-    expectedSubtotalCents: context.expectedSubtotalCents,
   };
 }
 

@@ -114,6 +114,12 @@ número (huecos normales de una sequence).
 | `payment.cashAmountCents` | opcional, > 0, ≤ 99 999.99 y **≥ subtotal** |
 | `notes` | opcional, ≤500 (vacío → NULL) |
 
+**Recoger en sucursal (desde 2026-11-06).** El checkout pide solo nombre y teléfono (el teléfono
+sigue siendo obligatorio en ambos tipos de entrega). `POST /api/pedidos` (`createOrder`) **no envía** a
+la base dirección, `cashAmountCents` ni `notes` cuando `delivery.type = pickup`, aunque el request los
+traiga: quedan NULL. `payment_method` sigue siendo `cash` (el cliente paga en efectivo al recoger; no
+se inventó otro método). Sin cambios en la base ni en `create_order`.
+
 Zod en el Route Handler da errores tempranos; la función repite las reglas porque
 puede invocarse directamente; los constraints de la tabla son la última línea.
 
