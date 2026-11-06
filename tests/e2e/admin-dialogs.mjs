@@ -136,6 +136,12 @@ try {
     let height = null;
     Object.defineProperty(fake, "height", { get: () => height ?? innerHeight });
     window.__setVisualHeight = (h) => { height = h; fake.dispatchEvent(new Event("resize")); };
+    // iOS 26: innerHeight coincide con el área visible aunque el bloque contenedor de
+    // `fixed` se extienda detrás de la barra inferior (donde Safari recorta).
+    const realInner = Object.getOwnPropertyDescriptor(window, "innerHeight") ?? Object.getOwnPropertyDescriptor(Window.prototype, "innerHeight");
+    let inner = null;
+    Object.defineProperty(window, "innerHeight", { configurable: true, get: () => inner ?? realInner.get.call(window) });
+    window.__setInnerHeight = (h) => { inner = h; };
     Object.defineProperty(window, "visualViewport", { configurable: true, get: () => fake });
   });
   await kpage.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
@@ -163,6 +169,20 @@ try {
   await sleep(250);
   const back = await kpage.evaluate(() => { const d = document.querySelector("dialog[open]").getBoundingClientRect(); return { bottom: d.bottom, vh: innerHeight }; });
   check(`teclado cerrado: la hoja vuelve al fondo (bottom ${Math.round(back.bottom)} = ${back.vh})`, Math.abs(back.bottom - back.vh) <= 1, back);
+
+  // Barra inferior flotante de iOS 26 SIMULADA: área visible 764 px dentro de un bloque
+  // contenedor de 844 px; innerHeight informa 764 (como el área visible).
+  const visible = 764;
+  await kpage.evaluate((h) => { window.__setInnerHeight(h); window.__setVisualHeight(h); }, visible);
+  await sleep(250);
+  const bar = await kpage.evaluate(() => {
+    const d = document.querySelector("dialog[open]").getBoundingClientRect();
+    const actions = [...document.querySelectorAll("dialog[open] .border-t button")].filter((b) => b.checkVisibility()).map((b) => b.getBoundingClientRect().bottom);
+    return { bottom: d.bottom, height: d.height, actionsBottom: Math.max(...actions) };
+  });
+  check(`barra de iOS 26: la hoja termina en el borde visible (bottom ${Math.round(bar.bottom)} ≈ ${visible}), no detrás de la barra`, Math.abs(bar.bottom - visible) <= 1, bar);
+  check("barra de iOS 26: acciones dentro del área visible y altura ≤ 92 %", bar.actionsBottom <= visible + 1 && bar.height <= visible * 0.92 + 1, bar);
+  await kpage.evaluate(() => { window.__setInnerHeight(null); window.__setVisualHeight(null); });
   await kpage.keyboard.press("Escape");
   await kctx.close();
 

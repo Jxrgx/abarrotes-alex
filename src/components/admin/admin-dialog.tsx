@@ -60,14 +60,21 @@ export function AdminDialog({ open, onClose, title, description, busy = false, s
   }, [open]);
 
   // Móvil: la hoja se ancla al viewport VISUAL, no al de layout. En iOS Safari el
-  // teclado virtual (y la barra dinámica) reducen solo el viewport visual: `dvh` y
-  // `bottom: 0` siguen midiendo el de layout, así que la hoja quedaba detrás del
-  // teclado. Aquí se publica la distancia al borde visible y la altura real disponible
+  // teclado virtual reduce solo el viewport visual, y en iOS 26 el bloque contenedor de
+  // `position: fixed` se extiende detrás de la barra inferior flotante, donde Safari
+  // RECORTA el contenido: con `bottom: 0` / `dvh` el cuerpo y las acciones quedaban
+  // cortados. `innerHeight` no sirve para medirlo (en iOS coincide con el área visible),
+  // así que se mide el bloque contenedor real con una sonda `fixed; top:0; bottom:0`.
+  // Se publica la distancia al borde visible y la altura disponible
   // (--sheet-bottom / --sheet-max-h); en sm+ las clases del modal centrado las ignoran.
   useEffect(() => {
     const dialog = ref.current;
     const viewport = window.visualViewport;
     if (!open || !dialog || !viewport) return;
+    const probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = "position:fixed;top:0;bottom:0;left:0;width:0;visibility:hidden;pointer-events:none";
+    document.body.append(probe);
     let frame = 0;
     const reset = () => {
       dialog.style.removeProperty("--sheet-bottom");
@@ -78,7 +85,9 @@ export function AdminDialog({ open, onClose, title, description, busy = false, s
       frame = requestAnimationFrame(() => {
         // Con zoom de pellizco el viewport visual no representa el área de la hoja.
         if (Math.abs(viewport.scale - 1) > 0.01) return reset();
-        const bottom = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
+        // Alto del bloque contenedor de `fixed` (puede incluir zonas bajo la barra de Safari).
+        const fixedHeight = probe.getBoundingClientRect().height || window.innerHeight;
+        const bottom = Math.max(0, Math.round(fixedHeight - viewport.height - viewport.offsetTop));
         dialog.style.setProperty("--sheet-bottom", `${bottom}px`);
         dialog.style.setProperty("--sheet-max-h", `${Math.floor(viewport.height * 0.92)}px`);
         // Con el teclado abierto, el campo enfocado sigue visible dentro del cuerpo desplazable.
@@ -91,10 +100,13 @@ export function AdminDialog({ open, onClose, title, description, busy = false, s
     update();
     viewport.addEventListener("resize", update);
     viewport.addEventListener("scroll", update);
+    window.addEventListener("resize", update); // la barra de Safari se expande o contrae
     return () => {
       cancelAnimationFrame(frame);
       viewport.removeEventListener("resize", update);
       viewport.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      probe.remove();
       reset();
     };
   }, [open]);

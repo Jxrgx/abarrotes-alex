@@ -156,7 +156,7 @@ catalog-actions.ts   Server Actions: requireAdmin → Zod → cliente autenticad
 | `src/lib/admin/load.ts` | `loadAdminSection()`: error de consulta → estado, nunca cierra la sesión. |
 | `src/lib/slug.ts` | `slugify()` (única definición). |
 | `components/admin/admin-list.tsx` | `AdminPageHeader`, `SearchInput`, `ActiveBadge`, `AdminTable`, `AdminCardList`/`AdminCard`, `MetaList`, `ListSummary`, `NoResults`, `EmptyState`, `ListSkeleton`, `AdminLoadError`. |
-| `components/admin/admin-dialog.tsx` | Diálogo adaptativo (`<dialog>` nativo): hoja inferior en móvil, modal ≤ 512px en sm+. En móvil la hoja se ancla al **viewport visual** (`--sheet-bottom`/`--sheet-max-h` desde `visualViewport`: teclado y barra de Safari iOS) y, en táctil, no enfoca campos de texto al abrir (iOS abriría el teclado). Regresión: `test:e2e:dialogs`. |
+| `components/admin/admin-dialog.tsx` | Diálogo adaptativo (`<dialog>` nativo): hoja inferior en móvil, modal ≤ 512px en sm+. En móvil la hoja se ancla al **viewport visual** (`--sheet-bottom`/`--sheet-max-h` desde `visualViewport` y el alto real del bloque contenedor de `fixed`, medido con una sonda: teclado y barra inferior flotante de iOS 26, donde Safari recorta lo que queda debajo) y, en táctil, no enfoca campos de texto al abrir (iOS abriría el teclado). Regresión: `test:e2e:dialogs`. |
 | `components/admin/catalog-form.tsx` | `CatalogFormDialog` + campos `NameField`, `SortOrderField`, `ActiveField`, `WarningNote`. |
 | `components/admin/active-toggle.tsx` | `useActiveToggle` + `DeactivateDialog`. |
 | `components/admin/row-actions.tsx` | "Editar" + menú ⋯ (Base UI Menu). |
