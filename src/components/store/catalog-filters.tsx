@@ -169,7 +169,7 @@ function MobileFilters({ navigate, isPending, ...props }: ControlProps & { isPen
           if (event.target === event.currentTarget) close();
         }}
       >
-        <div className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
           <h2 id="filtros-titulo" className="text-lg font-semibold">
             Filtros
           </h2>
@@ -178,7 +178,8 @@ function MobileFilters({ navigate, isPending, ...props }: ControlProps & { isPen
           </Button>
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
+        {/* flex-auto, no flex-1: en Safari iOS la base 0% colapsaba el cuerpo (ver admin-dialog.tsx). */}
+        <div className="min-h-0 flex-auto space-y-5 overflow-y-auto overscroll-contain px-4 py-4">
           <FilterSelect
             id="sheet-categoria"
             label="Categoría"
@@ -254,7 +255,7 @@ function MobileFilters({ navigate, isPending, ...props }: ControlProps & { isPen
           </fieldset>
         </div>
 
-        <div className="flex gap-3 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex shrink-0 gap-3 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Button
             variant="secondary"
             className="flex-1"

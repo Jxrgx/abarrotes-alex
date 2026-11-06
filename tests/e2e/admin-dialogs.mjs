@@ -84,6 +84,8 @@ const measure = (page) => page.evaluate(() => {
     actionsVisible: actions.length > 0 && actions.every((a) => a.top >= 0 && a.bottom <= innerHeight + 1 && a.bottom <= r.bottom + 1),
     hOverflow: d.scrollWidth > d.clientWidth + 1 || (body ? body.scrollWidth > body.clientWidth + 1 : false) || document.documentElement.scrollWidth > innerWidth + 1,
     bodyScrolls, pageMoved: after.page !== before.page, dialogScrolled: after.dialog !== 0,
+    // Safari iOS colapsaba el cuerpo (flex-basis 0%): debe mostrar su contenido o al menos 120 px.
+    bodyHeight: body ? body.clientHeight : null, bodyCollapsed: body ? body.clientHeight < Math.min(body.scrollHeight, 120) - 1 : false,
     focusInside: d.contains(active),
     focusIsTextField: active instanceof HTMLInputElement && !["checkbox", "radio", "button", "submit", "file"].includes(active.type) || active instanceof HTMLTextAreaElement,
     coarse: matchMedia("(pointer: coarse)").matches,
@@ -117,11 +119,38 @@ try {
       }
       check(`${label}: título visible, acciones accesibles, sin scroll horizontal`, m.titleVisible && m.actionsVisible && !m.hOverflow, m);
       check(`${label}: una sola zona de scroll (cuerpo), sin mover la página ni el <dialog>`, m.bodyScrolls !== false && !m.pageMoved && !m.dialogScrolled, m);
+      check(`${label}: el cuerpo no colapsa (${m.bodyHeight}px visibles)`, !m.bodyCollapsed, m);
       await page.keyboard.press("Escape");
       await sleep(250);
       check(`${label}: Esc cierra y el foco vuelve a la página`, await page.evaluate(() => !document.querySelector("dialog[open]") && document.activeElement !== document.body));
     }
   }
+  // Otras hojas con el mismo patrón: menú del panel y filtros de la tienda (390 táctil).
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+  console.log("== Menú del panel y Filtros de la tienda (390 táctil)");
+  await page.goto(`${BASE}/admin`, { waitUntil: "networkidle0" });
+  await press(page, await page.evaluateHandle(() => [...document.querySelectorAll("header button")].find((b) => b.checkVisibility() && b.textContent.includes("Menú"))));
+  await sleep(400);
+  const menu = await page.evaluate(() => {
+    const d = document.querySelector("dialog[open]");
+    const out = [...d.querySelectorAll("button")].find((b) => /Cerrar sesión/.test(b.textContent));
+    const r = d.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, vh: innerHeight, signOutBottom: out?.getBoundingClientRect().bottom };
+  });
+  check(`menú: ocupa el alto visible y «Cerrar sesión» dentro de la pantalla`, Math.abs(menu.top) <= 1 && Math.abs(menu.bottom - menu.vh) <= 1 && menu.signOutBottom <= menu.vh, menu);
+  await page.keyboard.press("Escape");
+  await page.goto(`${BASE}/productos`, { waitUntil: "networkidle0" });
+  await press(page, await page.evaluateHandle(() => [...document.querySelectorAll("main button")].find((b) => b.checkVisibility() && b.textContent.includes("Filtros"))));
+  await sleep(400);
+  const filters = await page.evaluate(() => {
+    const d = document.querySelector("dialog[open]");
+    const body = d.querySelector(".overflow-y-auto");
+    const r = d.getBoundingClientRect();
+    const actions = [...d.querySelectorAll("button")].filter((b) => /Ver resultados|Limpiar/.test(b.textContent)).map((b) => b.getBoundingClientRect().bottom);
+    return { bottom: r.bottom, vh: innerHeight, body: body.clientHeight, content: body.scrollHeight, actionsBottom: Math.max(...actions) };
+  });
+  check(`filtros de la tienda: el cuerpo no colapsa (${filters.body}px de ${filters.content}px) y acciones visibles`, filters.body >= Math.min(filters.content, 120) - 1 && filters.actionsBottom <= filters.vh && Math.abs(filters.bottom - filters.vh) <= 1, filters);
+  await page.keyboard.press("Escape");
   await ctx.close();
 
   // Teclado SIMULADO: se reemplaza window.visualViewport por uno controlable, como lo

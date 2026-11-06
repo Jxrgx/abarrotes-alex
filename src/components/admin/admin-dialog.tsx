@@ -60,12 +60,10 @@ export function AdminDialog({ open, onClose, title, description, busy = false, s
   }, [open]);
 
   // Móvil: la hoja se ancla al viewport VISUAL, no al de layout. En iOS Safari el
-  // teclado virtual reduce solo el viewport visual, y en iOS 26 el bloque contenedor de
-  // `position: fixed` se extiende detrás de la barra inferior flotante, donde Safari
-  // RECORTA el contenido: con `bottom: 0` / `dvh` el cuerpo y las acciones quedaban
-  // cortados. `innerHeight` no sirve para medirlo (en iOS coincide con el área visible),
-  // así que se mide el bloque contenedor real con una sonda `fixed; top:0; bottom:0`.
-  // Se publica la distancia al borde visible y la altura disponible
+  // teclado virtual reduce solo el viewport visual (`bottom: 0` y `dvh` no cambian), así
+  // que sin esto la hoja quedaba detrás del teclado. El alto del bloque contenedor de
+  // `position: fixed` se mide con una sonda `fixed; top:0; bottom:0` (más fiable que
+  // `innerHeight` en iOS). Se publica la distancia al borde visible y la altura disponible
   // (--sheet-bottom / --sheet-max-h); en sm+ las clases del modal centrado las ignoran.
   useEffect(() => {
     const dialog = ref.current;
@@ -136,7 +134,7 @@ export function AdminDialog({ open, onClose, title, description, busy = false, s
     >
       {open && (
         <>
-          <div className="flex items-start gap-3 border-b px-4 py-3 sm:px-5">
+          <div className="flex shrink-0 items-start gap-3 border-b px-4 py-3 sm:px-5">
             <div className="min-w-0 flex-1 py-1.5">
               <h2 id={titleId} className="text-lg font-semibold leading-tight">
                 {title}
@@ -159,10 +157,14 @@ export function AdminDialog({ open, onClose, title, description, busy = false, s
 }
 
 // Cuerpo desplazable y pie fijo con las acciones (dentro del <form> si lo hay).
+// flex-auto (1 1 auto), NO flex-1 (1 1 0%): en Safari iOS la base 0% dentro de un
+// <dialog> de alto automático se resolvía como 0 y el cuerpo colapsaba (solo se veía
+// el encabezado). Con base "auto" mide su contenido y solo se encoge (con scroll) si no
+// cabe en max-height. Encabezado y pie no se encogen (shrink-0).
 // overscroll-contain: al llegar al final, el gesto no arrastra la página de fondo.
 export function DialogBody({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn("min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5", className)}>
+    <div className={cn("min-h-0 flex-auto space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5", className)}>
       {children}
     </div>
   );
@@ -183,7 +185,7 @@ function isTextEntry(element: HTMLElement) {
 
 export function DialogFooter({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col-reverse gap-2 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-5 sm:pb-3 [&>button]:h-11 sm:[&>button]:h-10">
+    <div className="flex shrink-0 flex-col-reverse gap-2 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-5 sm:pb-3 [&>button]:h-11 sm:[&>button]:h-10">
       {children}
     </div>
   );
