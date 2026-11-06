@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { getCurrentBranch } from "@/lib/catalog/branches";
@@ -17,13 +18,16 @@ export function SiteFooter() {
 }
 
 async function FooterDetails() {
+  // Contenido de request (Cache Components): sin esto, si la consulta falla rápido
+  // (Supabase inaccesible o sin variables durante el build), `new Date()` se ejecutaría
+  // dentro del prerender y rompería el build.
+  await connection();
   let branch = null;
   try {
     branch = await getCurrentBranch();
   } catch {
     // Sin datos de sucursal el footer sigue siendo útil.
   }
-  // Se calcula después de la consulta para no romper el prerender (Cache Components).
   const year = new Date().getFullYear();
 
   return (

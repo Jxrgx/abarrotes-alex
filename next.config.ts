@@ -49,11 +49,20 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
 ];
 
+// PREPRODUCCIÓN (Fase 9D): el catálogo todavía es de prueba, así que ninguna página se
+// indexa (cabecera X-Robots-Tag en todas las respuestas; la navegación no cambia).
+// Lanzamiento definitivo: cambiar a `true` y desplegar (docs/production.md §23).
+// Las páginas privadas (/admin, carrito, checkout, pedido) siguen con su propio noindex.
+const SEARCH_INDEXING_ENABLED = false;
+
 const nextConfig: NextConfig = {
   /* config options here */
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    const headers = SEARCH_INDEXING_ENABLED
+      ? securityHeaders
+      : [...securityHeaders, { key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return [{ source: "/:path*", headers }];
   },
   cacheComponents: true,
   partialPrefetching: true,

@@ -248,20 +248,67 @@ Diseño propuesto para el importador (fase futura):
 
 Hoy **no hay variables SERVER (secretas)**: la app no usa `service_role` ni secret keys.
 
-## 14. Vercel (checklist, sin desplegar)
+En Vercel, las dos `NEXT_PUBLIC_*` se asignan **solo a Production** (no a Preview ni a
+Development; ver §14). Se incrustan en el build, así que cualquier cambio requiere
+*Redeploy*. Ninguna variable `TEST-ONLY` va a Vercel.
 
-- [ ] Proyecto conectado al repositorio (rama `main` = Production).
-- [ ] Framework: Next.js; build `npm run build`; install `npm ci`; sin output dir manual.
-- [ ] **Node 24.x** en Project Settings (local usa 24; `package.json` no fija `engines`).
-- [ ] Variables: solo las dos `NEXT_PUBLIC_*` en *Production* (§13).
-- [ ] **Previews**: usan la misma base de producción. Proteger los deployments de preview
-  (Deployment Protection) o no definirles las variables, para no exponer el panel ni
-  registrar pedidos desde URLs de prueba.
-- [ ] Dominio agregado y DNS configurado; HTTPS automático (certificado de Vercel). HSTS ya
-  lo envía la app.
-- [ ] Verificar headers en el dominio final: `npm run test:security` con `E2E_BASE_URL`.
-- [ ] Región de funciones cercana a Supabase (`us-east-1`/Washington, `iad1`).
-- [ ] `/admin` responde con `noindex` y `no-store` (ya implementado).
+## 14. Vercel (Fase 9D: preproducción)
+
+Flujo estándar de Next.js en Vercel, que es un adaptador verificado de Next 16: SSR, PPR,
+Server Actions, Route Handlers y `proxy.ts`. **Sin `vercel.json`**: todo lo necesario se
+resuelve con las convenciones de Next y los valores por defecto de Vercel. Netlify no se
+prepara.
+
+| Ajuste | Valor | Por qué |
+| --- | --- | --- |
+| Framework preset | Next.js (autodetectado) | Build `next build`; Vercel instala con `npm ci` por el `package-lock.json` |
+| Node.js | **24.x**, fijado con `engines.node` en `package.json` (tiene prioridad sobre el ajuste del dashboard) | Ver abajo |
+| Región de funciones | **`iad1`** (Washington D.C.), el valor por defecto de proyectos nuevos | Junto a Supabase `us-east-1`. Solo hay que comprobarla en Settings → Functions |
+| Runtime | Node.js en todo (por defecto; ningún `export const runtime`) | sharp necesita Node; `proxy.ts` en Next 16 solo corre en Node |
+| Variables | Solo las dos `NEXT_PUBLIC_*`, solo en **Production** (§13) | Previews sin acceso a la base |
+| Deployment Protection | **Standard Protection** + Vercel Authentication (por defecto) | Protege previews y URLs por deployment; deja pública la URL de producción |
+
+**Node 24.x en lugar de 26.x (el valor por defecto de Vercel desde el 29-oct-2026).**
+- Node 24 es LTS soportada por Vercel y por todas las dependencias: Next ≥ 20.9, sharp ≥ 20.9,
+  supabase-js ≥ 22.
+- Toda la validación del MVP (unitarias, PGlite, E2E y QA) se hizo con Node 24.
+- En Node 26, el `fetch` de las funciones de Vercel negocia **HTTP/2**, y todas las llamadas
+  a Supabase pasan por `fetch`.
+- Migrar a 26 es una tarea aparte: probar local con Node 26, cambiar `engines` a `26.x` y
+  repetir la QA.
+
+**sharp.** El lockfile incluye `@img/sharp-linux-x64` y `@img/sharp-libvips-linux-x64`, los
+binarios que Vercel instala en Linux. Las Server Actions de imágenes corren en Node.
+
+**`next/image`.** `remotePatterns` se calcula en el build desde `NEXT_PUBLIC_SUPABASE_URL`: el
+host exacto del proyecto y solo `/storage/v1/object/public/product-images/**`.
+
+**Previews (no deben poder mutar la base).**
+1. Las variables de Supabase **no** se asignan a Preview.
+   - Un preview sin variables **no llega a desplegarse**: el build falla al prerenderizar con
+     "Faltan NEXT_PUBLIC_SUPABASE_URL…" (verificado localmente).
+   - Es un fallo cerrado: nunca hay un preview conectado a la base actual.
+2. Standard Protection exige iniciar sesión en Vercel para abrir cualquier preview.
+3. Opcional, para evitar deployments fallidos ruidosos: Settings → Git → *Ignored Build Step*
+   con "Only build production" (solo `main`).
+4. Cuando exista un Supabase de staging, sus variables podrán asignarse a Preview.
+
+**Indexación de preproducción.**
+- `next.config.ts` define `SEARCH_INDEXING_ENABLED = false`. Con eso, todas las respuestas
+  envían `X-Robots-Tag: noindex, nofollow` (una sola vez por respuesta, también en `/admin`).
+- No se usa `robots.txt` con `Disallow`, porque impediría que los buscadores vieran el
+  `noindex`.
+- La navegación no cambia.
+- Al lanzar: cambiar la constante a `true` y desplegar (§23).
+- Las páginas privadas (`/admin`, carrito, checkout, pedido) conservan su propio `noindex`.
+
+**HTTPS.**
+- HSTS y la CSP vienen de `next.config.ts`; Vercel no añade una CSP propia.
+- Las cookies de Auth de `@supabase/ssr` funcionan igual en HTTPS.
+- `crypto.randomUUID()` en el navegador exige contexto seguro (HTTPS o localhost): cumplido.
+- Los enlaces `wa.me` ya son HTTPS.
+- Comprobar en QA remoto que no haya cabeceras duplicadas.
+
 
 ## 15. Supabase: ¿limpiar el actual o crear uno nuevo?
 
@@ -460,9 +507,10 @@ separado de desarrollo/staging (o el Supabase local con `supabase start`).
 - [ ] Migraciones: `migration list` sin diferencias local/remoto.
 
 **VERCEL**
-- [ ] Proyecto, Node 24, variables de Production (§13–§14).
-- [ ] Previews protegidos o sin variables.
+- [ ] Proyecto, Node 24 (`engines`), región `iad1`, variables solo en Production (§13–§14).
+- [ ] Previews sin variables y con Standard Protection.
 - [ ] Build de producción exitoso.
+- [ ] **Indexación activada**: `SEARCH_INDEXING_ENABLED = true` en `next.config.ts` (§23).
 
 **DOMINIO**
 - [ ] Dominio conectado, HTTPS activo, redirección www ↔ raíz definida.
@@ -491,3 +539,91 @@ separado de desarrollo/staging (o el Supabase local con `supabase start`).
 **DOCUMENTACIÓN**
 - [ ] Este documento actualizado con lo ejecutado (fecha, resultado).
 - [ ] Checklist de [security.md](security.md) §21 revisada.
+
+## 23. Deploy de preproducción (Fase 9D) y paso a producción
+
+La primera URL `https://<proyecto>.vercel.app` es **preproducción**. Todavía contiene el
+catálogo del seed, datos `__E2E__` y pedidos de desarrollo, así que **no se presenta al
+cliente como sitio definitivo**. El deploy no modifica la base.
+
+### Pasos del deploy (los hace el dueño de las cuentas)
+
+1. **Vercel → Add New → Project → Import** del repositorio de GitHub (rama de producción:
+   `main`).
+   - Framework detectado: Next.js.
+   - Sin cambiar Build/Install/Output.
+   - Root Directory: `./`.
+2. **Antes del primer Deploy**, en *Environment Variables*, agregar solo para
+   **Production**:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+   Los valores son los mismos de `.env.local`. Desmarcar Preview y Development. Si se
+   desplegó antes de tener las variables, el build falla: agregarlas y hacer *Redeploy*.
+3. Deploy y anotar la URL de producción asignada (`<proyecto>.vercel.app`).
+4. Comprobar en Settings:
+   - **Functions → Region = Washington, D.C. (iad1)**.
+   - **Build and Deployment → Node.js** (lo fija `engines` en 24.x de todos modos).
+   - **Deployment Protection = Standard Protection**.
+5. Opcional: Settings → Git → *Ignored Build Step* → "Only build production".
+
+### Supabase Auth: URL Configuration (después de conocer la URL)
+
+La app solo usa email + contraseña (`signInWithPassword`). No usa OAuth, magic links,
+`redirectTo` ni recuperación de contraseña, así que el login **no depende** de estas URLs.
+Se configuran para que los correos que se envían desde el dashboard (invitación o
+restablecimiento) apunten al sitio real y no a `localhost`:
+
+| Campo | Preproducción | Producción definitiva |
+| --- | --- | --- |
+| Site URL | `https://<proyecto>.vercel.app` | `https://<dominio-final>` |
+| Redirect URLs | `https://<proyecto>.vercel.app/**` (y `http://localhost:3000/**` para desarrollo) | `https://<dominio-final>/**` (retirar la de vercel.app si deja de usarse) |
+
+No agregar comodines de previews (`https://*-<equipo>.vercel.app/**`): los previews no
+tienen acceso a la base.
+
+### QA remoto (no destructivo)
+
+Se ejecuta desde la máquina local contra la URL HTTPS. Las credenciales de prueba solo las
+usa el navegador automatizado local; **nunca** van a Vercel.
+
+```bash
+E2E_BASE_URL=https://<proyecto>.vercel.app npm run test:security
+E2E_BASE_URL=https://<proyecto>.vercel.app npm run test:e2e:store
+E2E_BASE_URL=https://<proyecto>.vercel.app npm run test:e2e:admin
+E2E_BASE_URL=https://<proyecto>.vercel.app npm run test:e2e:orders
+```
+
+- `test:e2e:store` simula `/api/pedidos` en el navegador.
+- `test:e2e:admin` y `test:e2e:orders` son de solo lectura.
+- No ejecutar `order-lifecycle`, `promotions`, `cleanup` ni subir o borrar imágenes.
+
+Revisar además:
+- headers: sin duplicados entre Vercel y Next;
+- `X-Robots-Tag` presente;
+- sin errores 5xx;
+- tiempos razonables y arranque en frío;
+- peso de JS e imágenes;
+- logs de funciones en Vercel.
+
+### Checklist manual en teléfono real (iPhone/Safari y Android/Chrome)
+
+- [ ] Inicio: logo, sucursal, horario y teléfono (el enlace abre el marcador).
+- [ ] Búsqueda instantánea: resultados, teclado y selección de un resultado.
+- [ ] Catálogo: filtros por categoría y orden; tarjetas e imágenes.
+- [ ] Carrito: agregar, cambiar cantidad, quitar; el contador del header se actualiza.
+- [ ] Checkout: formulario, teclado numérico en teléfono y validaciones. **Sin confirmar el
+  pedido** mientras siga siendo preproducción.
+- [ ] Panel: login, menú móvil, dashboard, pedidos (lectura), productos y promociones
+  (lectura), formularios abiertos y cerrados sin guardar.
+- [ ] Zoom y rotación sin desbordes; ícono al "Agregar a pantalla de inicio" (apple-icon).
+
+Solo se marca como probado lo que efectivamente se probó en un dispositivo físico.
+
+### Paso de preproducción a producción
+
+1. Limpieza §19 y reemplazo del catálogo §20 (fases posteriores).
+2. Horarios reales; admin del cliente (§10); eliminar la cuenta de desarrollo.
+3. Dominio en Vercel y Supabase Auth URLs al dominio final.
+4. `SEARCH_INDEXING_ENABLED = true` en `next.config.ts`, commit y deploy.
+5. QA remoto contra el dominio final y checklist de go-live (§22).
