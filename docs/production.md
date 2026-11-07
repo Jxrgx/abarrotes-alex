@@ -19,12 +19,57 @@ ni CAPTCHA (riesgos aceptados, ver [security.md](security.md) §0).
 | Logo | **Confirmado**: logo real integrado (§17) |
 | Horarios | **Temporalmente conservados** (los del seed); pendiente confirmación final |
 | Dominio | Pendiente |
-| Catálogo | Pendiente (carga y limpieza en una fase posterior; se esperan +1,000 productos) |
-| Hosting | Candidato actual: Vercel |
+| Catálogo | **Vacío** desde la limpieza definitiva (2026-11-06). Carga **manual** desde el panel por el cliente; se esperan +1,000 productos |
+| Hosting | Vercel (`https://abarrotes-alex.vercel.app`) |
+
+### Estado limpio actual (limpieza definitiva, 2026-11-06)
+
+Ejecutada con autorización explícita, en **una sola transacción** con guardas previas (sin
+PII: id fijo de la sucursal, conteos auditados y huellas md5 de lo que se conserva). Un
+fallo en cualquier guarda o verificación revertía todo. Antes se probó en PGlite (incluido
+el aborto atómico) y se evaluaron las guardas en remoto en modo solo lectura.
+
+| Tabla | Antes | Después |
+| --- | --- | --- |
+| `branches` | 1 | **1** (sin cambios, huella verificada) |
+| `branch_hours` | 7 | **7** (sin cambios, huella verificada) |
+| `categories` / `subcategories` / `brands` | 6 / 13 / 8 | 0 / 0 / 0 |
+| `products` / `branch_products` / `promotions` | 14 / 14 / 3 | 0 / 0 / 0 |
+| `orders` / `order_items` / `order_status_history` | 17 / 28 / 36 | 0 / 0 / 0 |
+| `private.order_push_events` | 13 | 0 (CASCADE desde `orders`) |
+| `profiles` / `auth.users` | 2 / 2 | **2 / 2** (admins: desarrollo + Alexander) |
+| `push_subscriptions` | 1 | **1** (dispositivo del panel, sin cambios) |
+| `private.app_secrets` | 1 | **1** (hash del secreto de despacho, sin cambios) |
+| `storage.objects` (`product-images`) | 2 | 0 (borradas con la Storage API y sesión admin) |
+| Migraciones | 15 | **15** |
+| `order_folio_seq` | `last_value 17`, `is_called true` | `last_value 1`, `is_called false` → el siguiente pedido será **ALEX-000001** (verificado sin `nextval`) |
+
+Sin cambios: bucket `product-images` (público) y sus 4 políticas, trigger
+`protect_objects_delete`, vistas, funciones, triggers, RLS/políticas y configuración de
+Realtime/Push. `realtime.messages` no se limpió: Realtime lo purga solo y solo contiene
+`{order_id, folio}`.
+
+- **Backup previo**: lógico (JSON por tabla + metadatos de Storage + las 2 imágenes + estado
+  de la secuencia), en una carpeta local del equipo de desarrollo, **fuera** del repositorio
+  y de carpetas sincronizadas. Contiene datos personales: no se versiona ni se sube; borrarlo
+  cuando ya no haga falta.
+- **QA posterior en producción (solo lectura)**: inicio, `/productos`, búsqueda, página fuera
+  de rango y carrito muestran estados vacíos amigables. El panel muestra dashboard en cero,
+  «Aún no hay…» en pedidos, productos, categorías, marcas y promociones, y en subcategorías
+  pide primero crear una categoría. La tarjeta de notificaciones y los manifiestos PWA
+  (`/tienda.webmanifest`, `/admin.webmanifest`, `/sw.js`) responden bien. No se enviaron
+  push ni se crearon datos.
+- **Siguiente paso (cliente, desde el panel)**: Categorías → Subcategorías → Marcas →
+  Productos → Imágenes → Promociones.
+- Pendientes que no cambian: eliminar la cuenta admin de desarrollo (§10),
+  `SEARCH_INDEXING_ENABLED` sigue en `false`, y los horarios son los del seed.
+
+Las secciones §1–§5 y §19–§20 describen el estado **anterior** a esta limpieza y quedan como
+referencia histórica.
 
 ---
 
-## 1. Inventario actual (Supabase remoto)
+## 1. Inventario de 9C.1 (histórico, 2026-11-05; ver «Estado limpio actual»)
 
 | Tabla | Filas | Detalle |
 | --- | --- | --- |
@@ -392,7 +437,10 @@ que el negocio, con la asesoría que corresponda, defina antes del lanzamiento:
 Esto es un asunto del negocio, no asesoría legal. Técnicamente ya se cumple: panel
 privado, RLS, `noindex` y logs sin PII ([security.md](security.md) §18).
 
-## 19. Plan de limpieza (9C.2 — **NO ejecutado**)
+## 19. Plan de limpieza parcial (9C.2 — histórico, **no ejecutado**)
+
+> Sustituido por la **limpieza definitiva del 2026-11-06** (ver «Estado limpio actual» al
+> inicio), que vació el catálogo y los pedidos completos en lugar de solo los datos E2E.
 
 Quién: requiere permisos que el admin no tiene por RLS (no hay `DELETE` de pedidos): lo
 ejecuta el dueño en el SQL editor de Supabase o, con autorización explícita, el CLI sin
@@ -448,7 +496,10 @@ de prueba. Sucursal: **no se borra**; se actualiza con los datos reales (§6).
 
 La cuenta admin de desarrollo se elimina **después** de crear y validar la del cliente (§10).
 
-## 20. Reemplazo gradual del catálogo semilla
+## 20. Reemplazo gradual del catálogo semilla (histórico)
+
+> Ya no aplica: el seed se retiró completo en la limpieza definitiva y la tienda queda vacía
+> hasta que el cliente cargue el catálogo real desde el panel.
 
 Para no dejar la tienda vacía ni mezclar datos falsos con reales:
 
@@ -490,12 +541,14 @@ separado de desarrollo/staging (o el Supabase local con `supabase start`).
 ## 22. Checklist de go-live
 
 **DATOS**
-- [ ] Dump previo a la limpieza (§16).
-- [ ] Limpieza §19 ejecutada y verificada (0 pedidos, 0 `__E2E__`, sequence reiniciada).
+- [x] Backup previo a la limpieza (lógico, fuera del repositorio; 2026-11-06).
+- [x] Limpieza definitiva ejecutada y verificada (0 pedidos, catálogo vacío, sequence
+  reiniciada sin consumir; 2026-11-06).
 - [x] Sucursal real: nombre, dirección, teléfono y WhatsApp (§6, 9C.2).
 - [ ] Horarios reales (hoy los del seed, conservados temporalmente).
 - [ ] WhatsApp probado manualmente con un pedido real controlado.
-- [ ] Catálogo real cargado, revisado y activado; seed retirado (§20).
+- [x] Seed retirado (limpieza definitiva).
+- [ ] Catálogo real cargado desde el panel y revisado.
 - [ ] Imágenes al menos de destacados (§9).
 - [ ] Promociones reales (si hay).
 
@@ -547,9 +600,9 @@ separado de desarrollo/staging (o el Supabase local con `supabase start`).
 
 ## 23. Deploy de preproducción (Fase 9D) y paso a producción
 
-La primera URL `https://<proyecto>.vercel.app` es **preproducción**. Todavía contiene el
-catálogo del seed, datos `__E2E__` y pedidos de desarrollo, así que **no se presenta al
-cliente como sitio definitivo**. El deploy no modifica la base.
+La primera URL `https://<proyecto>.vercel.app` es **preproducción**. Desde la limpieza
+definitiva (2026-11-06) ya no contiene seed, datos `__E2E__` ni pedidos de desarrollo: la
+tienda está vacía hasta que el cliente cargue su catálogo. El deploy no modifica la base.
 
 ### Pasos del deploy (los hace el dueño de las cuentas)
 
@@ -627,7 +680,7 @@ Solo se marca como probado lo que efectivamente se probó en un dispositivo fís
 
 ### Paso de preproducción a producción
 
-1. Limpieza §19 y reemplazo del catálogo §20 (fases posteriores).
+1. ~~Limpieza~~ (hecha el 2026-11-06) y carga manual del catálogo real por el cliente.
 2. Horarios reales; admin del cliente (§10); eliminar la cuenta de desarrollo.
 3. Dominio en Vercel y Supabase Auth URLs al dominio final.
 4. `SEARCH_INDEXING_ENABLED = true` en `next.config.ts`, commit y deploy.
