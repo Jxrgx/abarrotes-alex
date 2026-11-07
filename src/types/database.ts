@@ -578,7 +578,37 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      catalog_items: {
+        Row: {
+          brand_id: string | null
+          brand_name: string | null
+          brand_slug: string | null
+          branch_id: string
+          category_id: string
+          category_name: string
+          category_slug: string
+          category_sort_order: number
+          effective_price: number
+          id: string
+          image_path: string | null
+          is_available: boolean
+          is_featured: boolean
+          name: string
+          presentation: number | null
+          price: number
+          product_id: string
+          promo_price: number | null
+          sale_type: Database["public"]["Enums"]["sale_type"]
+          search_name: string | null
+          slug: string
+          subcategory_id: string
+          subcategory_name: string
+          subcategory_slug: string
+          subcategory_sort_order: number
+          unit: Database["public"]["Enums"]["product_unit"] | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_dashboard: {

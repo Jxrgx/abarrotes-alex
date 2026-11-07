@@ -22,7 +22,6 @@ import { parseProductForm, productMutationError } from "./product-forms";
 
 // Panel + tienda: inicio (destacados), catálogo y conteos del catálogo admin. La
 // tienda no usa caché; revalidar limpia además la caché del router del navegador.
-// /api/busqueda es dinámica (se recalcula en cada petición) con max-age=60 en el navegador.
 function revalidateProducts() {
   revalidatePath("/admin/productos");
   revalidatePath("/admin/categorias");

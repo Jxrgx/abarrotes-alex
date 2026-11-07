@@ -39,15 +39,7 @@ async function guard(page, handlers = {}) {
 const text = (page, selector) => page.$eval(selector, (e) => e.innerText.replace(/\s+/g, " ")).catch(() => "");
 const cartCount = (page) => page.evaluate(() => document.querySelector("header a[href='/carrito']")?.getAttribute("aria-label") ?? "");
 const productNames = (page) => page.evaluate(() => [...document.querySelectorAll("main article h3, main article h2")].map((h) => h.textContent.trim()));
-const visibleCombobox = (page) => page.evaluateHandle(() => [...document.querySelectorAll("header input[role=combobox]")].find((e) => e.checkVisibility()));
-async function typeLive(page, query) {
-  const input = await visibleCombobox(page);
-  await input.click({ clickCount: 3 });
-  await page.keyboard.press("Backspace");
-  if (query) await input.type(query, { delay: 15 });
-  await sleep(450);
-}
-const options = (page) => page.evaluate(() => [...document.querySelectorAll("[role=listbox] [role=option]")].map((o) => o.textContent.replace(/\s+/g, " ").trim()));
+const visibleSearch = async (page) => (await page.evaluateHandle(() => [...document.querySelectorAll("header input[type=search]")].find((e) => e.checkVisibility()))).asElement();
 
 // ---------------------------------------------------------------------------
 console.log("== Inicio");
@@ -139,86 +131,59 @@ await page.reload({ waitUntil: "networkidle0" });
 check("refresh conserva la búsqueda", (await productNames(page)).length === 2);
 
 // ---------------------------------------------------------------------------
-console.log("== Búsqueda instantánea");
+console.log("== Búsqueda en el grid (sin dropdown)");
+await page.goto(`${BASE}/productos`, { waitUntil: "networkidle0" });
+const allCount = (await productNames(page)).length;
+const searchInput = await visibleSearch(page);
+await searchInput.click();
+await searchInput.type("cola", { delay: 60 });
+await page.waitForFunction(() => new URL(location.href).searchParams.get("q") === "cola", { timeout: 10000 }).catch(() => null);
+await page.waitForFunction(() => !document.querySelector("[aria-busy=true]"), { timeout: 10000 }).catch(() => null);
+let names = await productNames(page);
+check("escribir filtra el grid en vivo (sin Enter): ?q=cola", new URL(page.url()).searchParams.get("q") === "cola" && names.length > 0 && names.length < allCount, names);
+check("«cola» no trae «chocolate» (prefijo de palabra)", !names.some((name) => /chocolate/i.test(name)), names);
+check("no existe dropdown/listbox de sugerencias", await page.evaluate(() => !document.querySelector("[role=listbox], [role=option], [role=combobox]")));
+check("el campo conserva el foco y el texto (sin remontarse)", await page.evaluate(() => document.activeElement?.matches("header input[type=search]") && document.activeElement.value === "cola"));
+check("conteo «N productos para “cola”»", /productos? para “cola”/.test(await text(page, "main [role=status]")));
+await searchInput.click({ clickCount: 3 });
+await page.keyboard.press("Backspace");
+await page.waitForFunction(() => !new URL(location.href).searchParams.has("q"), { timeout: 10000 }).catch(() => null);
+await page.waitForFunction(() => !document.querySelector("[aria-busy=true]"), { timeout: 10000 }).catch(() => null);
+check("limpiar el campo quita ?q y el grid vuelve completo", !new URL(page.url()).searchParams.has("q") && (await productNames(page)).length === allCount);
+// Atrás/adelante: el campo refleja la URL.
+await searchInput.type("leche", { delay: 40 });
+await page.waitForFunction(() => new URL(location.href).searchParams.get("q") === "leche", { timeout: 10000 }).catch(() => null);
+await page.goto(`${BASE}/productos?q=agua`, { waitUntil: "networkidle0" });
+await page.goBack({ waitUntil: "networkidle0" });
+check("atrás → el campo muestra la búsqueda de la URL", await page.evaluate(() => [...document.querySelectorAll("header input[type=search]")].every((input) => input.value === new URL(location.href).searchParams.get("q"))));
+await page.goForward({ waitUntil: "networkidle0" });
+check("adelante → ?q=agua en el campo y en el grid", await page.evaluate(() => [...document.querySelectorAll("header input[type=search]")].every((input) => input.value === "agua")) && (await productNames(page)).every((name) => /agua/i.test(name)));
+// Búsqueda + filtros: la categoría se conserva al escribir.
+await page.goto(`${BASE}/productos?categoria=bebidas`, { waitUntil: "networkidle0" });
+await (await visibleSearch(page)).type("agua", { delay: 40 });
+await page.waitForFunction(() => new URL(location.href).searchParams.get("q") === "agua", { timeout: 10000 }).catch(() => null);
+check("escribir conserva categoría (q + categoria)", new URL(page.url()).searchParams.get("categoria") === "bebidas");
+
+console.log("== Búsqueda desde el inicio");
 await page.goto(`${BASE}/`, { waitUntil: "networkidle0" });
-await typeLive(page, "c");
-check("1 carácter → sin sugerencias", (await options(page)).length === 0);
-await typeLive(page, "refesco");
-await page.waitForSelector("[role=listbox]", { timeout: 15000 }).catch(() => null);
-let list = await options(page);
-check("tolera errores (refesco → Refresco de cola)", list.some((o) => o.includes("Refresco de cola")), list);
-check("siempre ofrece «Ver todos los resultados»", list.at(-1)?.startsWith("Ver todos los resultados"));
-await typeLive(page, "japones");
-await page.waitForFunction(() => document.querySelectorAll("[role=option]").length > 1, { timeout: 10000 }).catch(() => null);
-check("sin acentos (japones → japonés)", (await options(page)).some((o) => o.includes("japonés")));
-await typeLive(page, "a");
-await typeLive(page, "de");
-list = await options(page);
-check(`máximo 6 productos + «Ver todos» (${list.length})`, list.length <= 7 && list.length >= 2);
-check("muestra promoción en sugerencias (Detergente con oferta)", await (async () => { await typeLive(page, "detergente"); return (await options(page)).some((o) => /Oferta|\$37\.00/.test(o)); })());
-// z-index: el panel queda por encima del contenido y del header sticky.
-check("panel de sugerencias por encima de todo (elementFromPoint)", await page.evaluate(() => {
-  const box = document.querySelector("[role=listbox]")?.getBoundingClientRect();
-  if (!box) return false;
-  const hit = document.elementFromPoint(box.left + box.width / 2, box.top + Math.min(box.height - 4, 30));
-  return Boolean(hit?.closest("[role=listbox]"));
-}));
-await typeLive(page, "cola");
-await page.waitForFunction(() => document.querySelectorAll("[role=option]").length > 1, { timeout: 10000 }).catch(() => null);
-await page.keyboard.press("ArrowDown");
-const first = await page.evaluate(() => document.activeElement.getAttribute("aria-activedescendant"));
-await page.keyboard.press("ArrowDown");
-await page.keyboard.press("ArrowUp");
-check("ArrowDown/ArrowUp mueven aria-activedescendant", Boolean(first) && (await page.evaluate(() => document.activeElement.getAttribute("aria-activedescendant"))) === first);
-check("la opción activa tiene aria-selected", await page.evaluate((id) => document.getElementById(id)?.getAttribute("aria-selected") === "true", first));
-await page.keyboard.press("Escape");
-check("Escape cierra la lista y deja el foco en el campo", (await options(page)).length === 0 && (await page.evaluate(() => document.activeElement?.getAttribute("role"))) === "combobox");
-await page.keyboard.press("ArrowDown");
-await sleep(200);
-await page.keyboard.press("ArrowDown");
-await Promise.all([page.waitForNavigation({ waitUntil: "networkidle0" }).catch(() => null), page.keyboard.press("Enter")]);
+await (await visibleSearch(page)).type("a", { delay: 40 });
+await sleep(700);
+check("1 carácter en el inicio → no navega todavía", new URL(page.url()).pathname === "/");
+await page.keyboard.type("gua", { delay: 40 });
 await page.waitForFunction(() => location.pathname === "/productos", { timeout: 10000 }).catch(() => null);
-check("Enter sobre un producto → /productos?producto=…", /producto=[0-9a-f-]{36}/.test(page.url()));
-const focused = await page.waitForFunction(() => document.activeElement?.matches("article[data-product-id]") && document.activeElement.dataset.highlight === "true", { timeout: 5000 }).then(() => true).catch(() => false);
-check("el producto elegido queda enfocado y resaltado", focused);
-check("live search: «cola» sugiere primero Refresco de cola (no «chocolate»)", await (async () => { await page.goto(`${BASE}/`, { waitUntil: "networkidle0" }); await typeLive(page, "cola"); await page.waitForFunction(() => document.querySelectorAll("[role=option]").length > 1, { timeout: 10000 }).catch(() => null); return (await options(page))[0]?.startsWith("Refresco de cola"); })());
-await typeLive(page, "cola");
-await page.waitForSelector("[role=listbox]", { timeout: 10000 }).catch(() => null);
-await page.mouse.click(5, 600);
-await sleep(300);
-check("clic fuera cierra la lista", (await options(page)).length === 0);
-await typeLive(page, "agua");
-await page.waitForSelector("[role=listbox]", { timeout: 10000 }).catch(() => null);
-await Promise.all([page.waitForNavigation({ waitUntil: "networkidle0" }).catch(() => null), page.keyboard.press("Enter")]);
-check("Enter sin opción activa → búsqueda completa ?q=agua", new URL(page.url()).searchParams.get("q") === "agua");
-// Clic (mouse) sobre una opción
-await typeLive(page, "galletas");
-await page.waitForFunction(() => document.querySelectorAll("[role=option]").length > 1, { timeout: 10000 }).catch(() => null);
-const optionBox = await page.$eval("[role=listbox] [role=option]", (o) => { const r = o.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
-await Promise.all([page.waitForNavigation({ waitUntil: "networkidle0" }).catch(() => null), page.mouse.click(optionBox.x, optionBox.y)]);
-check("clic en una sugerencia navega al producto", /producto=/.test(page.url()));
-await ctx.close();
+await page.waitForFunction(() => document.querySelectorAll("main article").length > 0, { timeout: 10000 }).catch(() => null);
+check("al escribir «agua» en el inicio lleva a /productos?q=agua", new URL(page.url()).pathname === "/productos" && new URL(page.url()).searchParams.get("q") === "agua");
+check("el campo conserva foco y texto tras navegar", await page.evaluate(() => document.activeElement?.matches("header input[type=search]") && document.activeElement.value === "agua"));
+check("sin dropdown en el inicio", await page.evaluate(() => !document.querySelector("[role=listbox]")));
 
-// Safari < 17.4 (iOS 16.4–17.3) no tiene Element.checkVisibility: ?producto= debe seguir funcionando.
-ctx = await browser.createBrowserContext();
-page = await newPage(ctx, 390);
-await guard(page);
-await page.evaluateOnNewDocument(() => { delete Element.prototype.checkVisibility; });
-const someId = (await (await fetch(`${BASE}/api/busqueda`)).json()).items[0].id;
-await page.goto(`${BASE}/productos?producto=${someId}`, { waitUntil: "networkidle0" });
-const legacyFocus = await page.waitForFunction((id) => document.activeElement?.getAttribute("data-product-id") === id, { timeout: 5000 }, someId).then(() => true).catch(() => false);
-check("sin checkVisibility (Safari < 17.4): ?producto= enfoca la tarjeta sin error", legacyFocus && !(await mainText(page)).includes("No pudimos cargar"));
-await ctx.close();
-
-// Fallback: el índice de búsqueda instantánea no carga.
-ctx = await browser.createBrowserContext();
-page = await newPage(ctx, 390);
-await guard(page, { "/api/busqueda": () => "abort" });
-await page.goto(`${BASE}/`, { waitUntil: "networkidle0" });
-await typeLive(page, "cola");
-await sleep(800);
-list = await options(page);
-check("sin índice (API caída) sigue ofreciendo la búsqueda completa", list.length >= 1 && list.at(-1).startsWith("Ver todos"), list);
+console.log("== ?page= (catálogo semilla: 1 página de 24)");
+await page.goto(`${BASE}/productos?page=99`, { waitUntil: "networkidle0" });
+check("página inexistente → «Esta página no existe» con acciones, sin paginación", /Esta página no existe/.test(await mainText(page)) && !(await page.$("nav[aria-label='Paginación de productos']")));
+for (const value of ["abc", "0", "-3", "1.5"]) {
+  const response = await page.goto(`${BASE}/productos?page=${value}`, { waitUntil: "networkidle0" });
+  check(`?page=${value} → página 1 sin error (${response.status()})`, response.status() === 200 && (await productNames(page)).length === allCount);
+}
+check("una sola página → sin paginación", !(await page.$("nav[aria-label='Paginación de productos']")));
 await ctx.close();
 
 // ---------------------------------------------------------------------------

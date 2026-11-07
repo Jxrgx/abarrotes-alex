@@ -1,5 +1,6 @@
 import { PackageSearch, Store } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { CategoryNav } from "@/components/store/category-nav";
@@ -8,12 +9,13 @@ import { Faq } from "@/components/store/faq";
 import { Hero } from "@/components/store/hero";
 import { ProductGrid, ProductRail } from "@/components/store/product-list";
 import { SectionHeader } from "@/components/store/section-header";
+import { buttonVariants } from "@/components/ui/button";
 import { CatalogSkeleton, StoreInfoSkeleton } from "@/components/store/skeletons";
 import { StoreInfo } from "@/components/store/store-info";
 import { getBranchHours, getCurrentBranch } from "@/lib/catalog/branches";
 import { getActiveCategories } from "@/lib/catalog/categories";
 import { groupBranchHours } from "@/lib/catalog/hours";
-import { getBranchProducts } from "@/lib/catalog/products";
+import { queryCatalog } from "@/lib/catalog/products";
 
 export const metadata: Metadata = {
   title: { absolute: "Abarrotes Alex | Todo lo que necesitas, cerca de ti" },
@@ -46,6 +48,9 @@ export default function HomePage() {
   );
 }
 
+const HOME_RAIL_SIZE = 12;
+const HOME_GRID_SIZE = 24;
+
 async function HomeCatalog() {
   const [branch, categories] = await Promise.all([getCurrentBranch(), getActiveCategories()]);
 
@@ -61,9 +66,16 @@ async function HomeCatalog() {
     );
   }
 
-  const products = await getBranchProducts(branch.id);
-  const offers = products.filter((product) => product.promoPrice !== null);
-  const featured = products.filter((product) => product.isFeatured);
+  // Escala con +1000 productos: cada sección pide solo lo que muestra (en paralelo).
+  // El catálogo completo, con búsqueda y paginación, vive en /productos.
+  const [offersPage, featuredPage, productsPage] = await Promise.all([
+    queryCatalog(branch.id, { onSale: true, pageSize: HOME_RAIL_SIZE }),
+    queryCatalog(branch.id, { featured: true, pageSize: HOME_RAIL_SIZE }),
+    queryCatalog(branch.id, { pageSize: HOME_GRID_SIZE }),
+  ]);
+  const offers = offersPage.items;
+  const featured = featuredPage.items;
+  const products = productsPage.items;
 
   return (
     <div className="page-container space-y-10 py-8 md:space-y-12 md:py-10">
@@ -99,7 +111,16 @@ async function HomeCatalog() {
           action={products.length > 0 ? { href: "/productos", label: "Ver todo" } : undefined}
         />
         {products.length > 0 ? (
-          <ProductGrid products={products} />
+          <>
+            <ProductGrid products={products} />
+            {productsPage.total > products.length && (
+              <div className="mt-8 flex justify-center">
+                <Link href="/productos" className={buttonVariants({ variant: "secondary", size: "lg", className: "w-full sm:w-auto" })}>
+                  Ver todos los productos ({productsPage.total})
+                </Link>
+              </div>
+            )}
+          </>
         ) : (
           <EmptyState
             icon={PackageSearch}

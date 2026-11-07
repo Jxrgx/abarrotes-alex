@@ -12,6 +12,7 @@ la única fuente de verdad: recargar, compartir y atrás/adelante conservan el e
 | `subcategoria` | slug **dentro** de la categoría | `/productos?categoria=bebidas&subcategoria=refrescos` |
 | `marca`        | slug de marca                   | `/productos?marca=burbuja`                |
 | `orden`        | `precio-asc`, `precio-desc`     | `/productos?q=cola&orden=precio-asc`      |
+| `page`         | entero ≥ 1 (24 por página)      | `/productos?q=cola&categoria=bebidas&page=2` |
 
 Todos se combinan (intersección). La lógica pura vive en
 [`src/lib/catalog/filters.ts`](../src/lib/catalog/filters.ts) (`parseCatalogParams`,
@@ -32,6 +33,11 @@ Todos se combinan (intersección). La lógica pura vive en
   (`brand_id` NULL); el embed de `brands` nunca usa `!inner`.
 - **Quitar un chip** elimina solo ese filtro. Quitar la categoría también quita la subcategoría.
 - **Limpiar filtros** quita búsqueda, categoría, subcategoría y marca; conserva el orden.
+- **`page`** no forma parte de los filtros (`CatalogFilters`): cualquier enlace o cambio de
+  búsqueda, categoría, subcategoría, marca u orden vuelve a la **página 1**. Solo la
+  paginación agrega `page` (`catalogHref(filtros, página)`). Inválido (`abc`, `0`, `-3`,
+  `1.5`, enorme) → página 1; repetido → el primero; mayor que el total → «Esta página no
+  existe» con enlaces a la primera y la última (nunca 500).
 
 ## Búsqueda completa (`/productos?q=`)
 
@@ -49,66 +55,81 @@ Todos se combinan (intersección). La lógica pura vive en
   comparan con la misma normalización en el servidor (sus ids van en el `or`).
 - El texto se normaliza (NFC) y solo conserva letras, números, espacios, `-`, `.` y `'`;
   así no llegan caracteres con significado en los filtros de PostgREST.
-- **Desde el header**: en `/productos` la búsqueda conserva categoría, subcategoría,
-  marca y orden (los filtros activos quedan visibles como chips y el estado vacío
-  ofrece "Buscar en todos los productos"). Desde cualquier otra página empieza una
-  búsqueda nueva en `/productos?q=…`.
+- **Regla de coincidencia (final)**: cada término, normalizado (minúsculas, sin acentos),
+  debe aparecer **al inicio de una palabra** de `search_name` (`term*`, `* term*` o
+  `*-term*`), o ser el inicio de una palabra del nombre de su marca, subcategoría o
+  categoría. Términos combinados con AND. `coca` → "Coca-Cola"; `cola` → "Refresco de
+  cola" y "Coca-Cola", **nunca** "chocolate"; `jabon` → "Jabón"; `lacteos` → productos
+  de "Lácteos". Sin tolerancia a errores de escritura (decisión: se eliminó Fuse.js).
 
-## Búsqueda instantánea (Fase 4C)
+## Búsqueda en el grid (sin dropdown)
 
-Autocomplete del campo "Buscar productos..." con **Fuse.js 7.5.0**. Es una mejora
-progresiva: la búsqueda completa de arriba sigue existiendo y es la que se usa con
-Enter o "Ver todos".
+El buscador del header (`SearchField`) es un input normal que **filtra el grid**; no hay
+sugerencias, panel ni overlay (se eliminó la búsqueda instantánea con Fuse.js y su índice
+`GET /api/busqueda`, que descargaba el catálogo completo al navegador).
 
 ```
-GET /api/busqueda (cliente público, 1 consulta) → índice ligero → Fuse.js en el navegador → ≤ 6 resultados
+input → debounce 250 ms → URL (?q=…, página 1) → Server Component consulta UNA página → grid
 ```
 
-- **Índice** (`LiveSearchItem`): id, slug, nombre, presentación, marca, categoría y
-  subcategoría (nombre y slug), `image_path`, precio y precio promocional en centavos,
-  disponibilidad. Sin datos administrativos ni de pedidos. ~350 bytes por producto
-  (12 productos ≈ 4 KB). Se pide **una vez por visita** al enfocar el campo; caché
-  `public, max-age=60`. No hay consultas por tecla.
-- **Normalización**: minúsculas, sin acentos y puntuación como espacio
-  (`"Coca-Cola"` → `"coca cola"`) solo para comparar; el texto mostrado no cambia.
-- **Configuración** (`src/lib/catalog/live-search.ts`): pesos nombre 0.55, marca 0.25,
-  subcategoría 0.15, categoría 0.05; `threshold` 0.4 con `ignoreLocation` para tolerar
-  errores (`cocacla`, `japnes`); después solo se conservan resultados con score
-  ≤ mejor + 0.15 (`RELATIVE_SCORE_WINDOW`), lo que elimina coincidencias lejanas
-  (`coca` ya no trae "Cacahuate"). Mínimo **2 caracteres**, máximo **6 resultados**.
-- **Resultados**: miniatura/placeholder, nombre + presentación, marca, precio efectivo
-  (misma `effectivePrice` del catálogo) con el anterior tachado si hay oferta, y
-  "Agotado" cuando corresponde. Sin controles de carrito.
-- **Elegir un resultado** → `/productos?producto=<id>`: la tarjeta se desplaza al
-  centro y se resalta ~2.4 s (`ProductFocus`). `producto` es solo ayuda visual (UUID
-  validado; uno inválido se ignora; no filtra ni cambia precios). Desde `/productos`
-  se conservan los filtros que no excluyen al producto (misma categoría,
-  subcategoría o marca) y el orden; `q` se descarta porque Fuse es difuso y la
-  búsqueda completa podría no incluir el resultado.
-- **Teclado** (patrón combobox de WAI-ARIA, `aria-activedescendant` + listbox):
-  ↓/↑ recorren las opciones (circular, incluida "Ver todos"); Enter abre la opción
-  activa o, sin opción activa, hace la búsqueda completa (nunca elige la primera
-  sola); Esc cierra y deja el foco en el campo; Tab no se intercepta. Clic o toque
-  fuera cierra. Los cambios de resultados se anuncian en una región `aria-live`.
-- **Si el índice falla**, el panel solo ofrece "Ver todos" y Enter sigue llevando a
-  `/productos?q=…`.
-- **Escala**: pensado para 100–500 productos (≈ 175 KB sin comprimir en el peor caso).
-  Con un catálogo mucho mayor habría que buscar en el servidor por tecla.
-- **Fuzzy vs. completa**: Fuse tolera errores (`cocacla` → Coca-Cola); PostgreSQL no.
-  Ambas ignoran acentos y mayúsculas, así que `jabon` encuentra lo mismo en las dos.
+- **En `/productos`**: filtra en vivo desde el primer carácter, sin Enter ni botón. La
+  primera búsqueda crea una entrada de historial (Atrás vuelve al listado sin buscar);
+  seguir escribiendo la **reemplaza** (no una entrada por tecla). Se conservan
+  categoría, subcategoría, marca y orden; la página vuelve a 1.
+- **Desde el inicio u otras páginas**: con 2 o más caracteres útiles navega a
+  `/productos?q=…` (una sola tecla no navega). El header es del layout: el input no se
+  remonta y **conserva foco, texto y teclado** al cambiar de página.
+- **Enter / "buscar" del teclado**: aplica sin esperar el debounce y cierra el teclado.
+- **Vaciar el campo** quita `q`.
+- **URL → input**: Atrás/Adelante, chips y "Limpiar" actualizan el texto. Si el cambio
+  de URL lo produjo el propio campo, no se pisa lo que el usuario siguió escribiendo
+  (estado `sentQ`); no hay bucles entre estado local, router y search params.
+- **Transición**: la navegación va en `useTransition`; el grid anterior se queda visible
+  y atenuado con "Actualizando…" (`CatalogResults` + `navigation-pending.ts`), sin
+  skeleton en cada tecla. El conteo (`role="status"`) anuncia el nuevo total.
+- **Móvil/Safari**: sin overlays ni sheets para buscar; el input conserva el foco (no se
+  recrea) y `scroll: false` evita saltos mientras se escribe en el catálogo.
 
-## Consultas
+## Paginación
 
-- Una consulta de productos por página con todos los filtros aplicados en
-  PostgreSQL (categoría, subcategoría, marca y términos de búsqueda sobre el embed `product`).
-- Para buscar por marca se resuelven en el servidor los ids de marcas cuyo nombre
-  coincide (la lista de marcas ya se carga para el filtro) y se usan en un `or`.
-- Una consulta ligera de facetas (`brand_id`, `subcategory_id` de los productos de la
-  sucursal) para ofrecer solo subcategorías y marcas con productos.
-- **Orden por precio efectivo** (`promotional_price` si hay promoción visible, si no
-  `price`): se hace en el servidor de Next.js después de la consulta. El precio
-  promocional viene de otra tabla filtrada por RLS; con cientos de productos ordenar
-  en memoria es más simple que una vista o función SQL. Desempate por nombre.
+- **24 por página** (`CATALOG_PAGE_SIZE`): múltiplo de 2, 3, 4 y 6 columnas, filas completas
+  en todos los anchos. `QA_CATALOG_PAGE_SIZE` (1–100) solo existe para probar varias
+  páginas con el seed en una instancia local; nunca se define en Vercel.
+- **Desktop**: `← Anterior 1 … 7 8 9 … 42 Siguiente →` (`paginationItems`: primera, última,
+  actual ±1, cinco seguidas cerca de los extremos; ≤ 7 páginas → todas).
+- **Móvil**: `← Anterior · Página 3 de 42 · Siguiente →`, objetivos de 40 px.
+- Enlaces reales (`<a href>`); en la primera/última página Anterior/Siguiente son
+  `<button disabled>` (no enlaces falsos). `<nav aria-label="Paginación de productos">`,
+  página actual con `aria-current="page"`. Con una sola página no se muestra.
+- Al cambiar de página se lleva al **inicio de la lista** (`#lista-productos`, con
+  `scroll-margin` para el header sticky), no al inicio de la página.
+
+## Consultas (vista `public.catalog_items`, migración `…20261107000100`)
+
+- Una fila por producto de la sucursal con todo lo que muestra la tarjeta y el **precio
+  efectivo** calculado en la base: la promoción vigente más baja **solo si es menor** al
+  precio normal; si no, el precio normal (misma semántica que antes).
+- `security_invoker = true`: la vista se evalúa con los permisos de quien consulta
+  (`anon` en la tienda), así que respeta la RLS existente: solo sucursales, productos,
+  subcategorías y categorías activos; promociones vigentes; marca con `LEFT JOIN` (un
+  producto sin marca o con marca inactiva aparece sin marca). Agotados siguen apareciendo.
+- **Filtro, orden global, conteo y paginación en PostgreSQL** (PostgREST `.order`,
+  `.range`, `count: "exact"`): nunca se descarga el catálogo completo. Orden
+  predeterminado: categoría, subcategoría, nombre, presentación, `id`; por precio:
+  `effective_price` asc/desc, nombre, presentación, `id` (desempate estable: las páginas
+  no repiten ni saltan productos).
+- Página más allá del final: PostgREST responde `PGRST103`; se hace un conteo `head` y la
+  página muestra «Esta página no existe».
+- **Inicio**: Ofertas y Destacados piden 12 cada una y "Nuestros productos" 24, con
+  "Ver todos los productos (N)" hacia `/productos`. **Carrito**: `getBranchProductsByIds`.
+- **Facetas**: `brand_id` y `subcategory_id` de los productos visibles (solo en el
+  servidor) para ofrecer subcategorías y marcas con productos.
+- **Índices**: no se agregaron. `branch_products (branch_id, product_id)` (único),
+  `products (subcategory_id)` y `(brand_id)` ya existen. El `ILIKE` por prefijo de
+  palabra (`'% term%'`) no aprovecha un btree y `pg_trgm` no está instalado; con miles de
+  productos el recorrido es de milisegundos (prueba de volumen con 1600 productos en
+  `tests/integration/catalog-view.test.mjs`). Reevaluar `pg_trgm` si el catálogo crece a
+  decenas de miles.
 
 ## Interfaz
 
@@ -117,6 +138,6 @@ GET /api/busqueda (cliente público, 1 consulta) → índice ligero → Fuse.js 
 - **Móvil**: chips de categoría/subcategoría deslizables y botón **Filtros** que abre
   un panel inferior (`<dialog>` nativo: foco atrapado, Esc cierra, el foco vuelve al
   botón). Los cambios se aplican con "Ver resultados".
-- Client Components: `SearchField` (header), `DesktopFilterControls`,
+- Client Components: `SearchField` (header), `CatalogResults`, `CatalogPagination`, `DesktopFilterControls`,
   `MobileFilterButton` y `PendingHint` (spinner mientras navega un enlace). El resto
   de la página es Server Component.

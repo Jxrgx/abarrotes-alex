@@ -23,7 +23,6 @@ y sus trade-offs siguen documentados abajo.
 | Superficie | Qué expone | Protección |
 | --- | --- | --- |
 | Tienda (`/`, `/productos`, `/carrito`, `/checkout`) | Catálogo público | Cliente público (anon) + RLS de solo lectura |
-| `GET /api/busqueda` | Índice ligero del catálogo | Solo datos públicos; caché pública 60 s |
 | `POST /api/carrito` | Precios/disponibilidad actuales | Solo lectura; JSON ≤ 16 KB; ≤ 100 UUID |
 | `POST /api/pedidos` | Crea pedidos | JSON ≤ 32 KB, Zod, y `create_order` como autoridad |
 | RPC `create_order` (llave pública) | Crea pedidos | Validación completa en la base, idempotencia (ver §3) |
@@ -194,7 +193,7 @@ object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self' blob:;
   el escape de React (sin `dangerouslySetInnerHTML` en el código).
 - Desarrollo agrega `'unsafe-eval'` y `ws:`/`wss:` (Turbopack/HMR).
 - WhatsApp funciona: es navegación (`<a href="https://wa.me/…">`), que la CSP no restringe.
-- Verificado sin violaciones: tienda, carrito, checkout, búsqueda instantánea, login,
+- Verificado sin violaciones: tienda, carrito, checkout, búsqueda del catálogo, login,
   panel, vista previa de imágenes (`blob:`) en producción (`next start`) y en `next dev`.
 - Mejora futura: CSP con nonce solo si se abandona el prerender parcial.
 
@@ -273,7 +272,7 @@ el comprobante del cliente vive en `sessionStorage` (se borra al cerrar la pesta
 ## 19. Caché
 
 `/admin/*`: `private, no-store` (proxy) y renderizado dinámico. `/api/pedidos` y
-`/api/carrito`: `no-store`. `/api/busqueda`: `public, max-age=60` (solo datos públicos).
+`/api/carrito`: `no-store`. (La búsqueda instantánea `/api/busqueda` se eliminó: la búsqueda es server-side en `/productos`.)
 La tienda no cachea datos de sesión: usa el cliente público, sin cookies.
 
 ## 20. Pruebas de seguridad

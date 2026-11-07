@@ -1,6 +1,6 @@
 import { getActiveBranches } from "@/lib/catalog/branches";
 import { toCents } from "@/lib/catalog/pricing";
-import { getBranchProducts } from "@/lib/catalog/products";
+import { getBranchProductsByIds } from "@/lib/catalog/products";
 import {
   type CartProductInfo,
   type CartResolveResponse,
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const branch = (await getActiveBranches()).find((item) => item.id === branchId) ?? null;
     const products = branch
-      ? await getBranchProducts(branch.id, { productIds: [...new Set(productIds)] })
+      ? await getBranchProductsByIds(branch.id, [...new Set(productIds)])
       : [];
 
     const response: CartResolveResponse = {

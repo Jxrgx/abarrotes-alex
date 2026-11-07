@@ -169,7 +169,12 @@ Solo lo que el sistema usa.
 
 ## 8. Estrategia de carga del catálogo inicial (100–500 productos)
 
-**Recomendación: D) combinación — hoja de cálculo (CSV) + importación controlada por script,
+> **Decisión del cliente (2026-11-07): carga MANUAL desde el panel.** No se implementa
+> importador Excel/CSV. El catálogo puede superar 1000 productos: la tienda ya busca,
+> ordena y pagina en la base (24 por página; ver [catalog.md](catalog.md)). Lo que sigue
+> en esta sección queda como referencia histórica de la evaluación.
+
+**Recomendación original: D) combinación — hoja de cálculo (CSV) + importación controlada por script,
 y el panel para correcciones y altas posteriores.**
 
 - **A) Panel uno por uno**: viable para < 50 productos; para 300 son horas de captura y
@@ -609,7 +614,7 @@ Revisar además:
 ### Checklist manual en teléfono real (iPhone/Safari y Android/Chrome)
 
 - [ ] Inicio: logo, sucursal, horario y teléfono (el enlace abre el marcador).
-- [ ] Búsqueda instantánea: resultados, teclado y selección de un resultado.
+- [ ] Búsqueda: escribir filtra el grid en vivo, el teclado no se cierra, Atrás/Adelante, paginación.
 - [ ] Catálogo: filtros por categoría y orden; tarjetas e imágenes.
 - [ ] Carrito: agregar, cambiar cantidad, quitar; el contador del header se actualiza.
 - [ ] Checkout: formulario, teclado numérico en teléfono y validaciones. **Sin confirmar el

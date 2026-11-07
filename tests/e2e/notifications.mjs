@@ -33,7 +33,12 @@ try {
 
   console.log("== Panel: tarjeta y Service Worker");
   check("login", (await login(page)) === "/admin");
-  await page.waitForFunction(() => /Notificaciones de pedidos/.test(document.querySelector("main")?.innerText ?? ""), { timeout: 15000 }).catch(() => null);
+  // La tarjeta llega del servidor como «Revisando este dispositivo…» y resuelve su estado
+  // al hidratar: se espera a que salga de ese estado (en producción tarda más que en local).
+  await page.waitForFunction(() => {
+    const text = document.getElementById("notificaciones-titulo")?.closest("section")?.innerText ?? "";
+    return /Notificaciones de pedidos/.test(text) && !/Revisando este dispositivo/.test(text);
+  }, { timeout: 15000 }).catch(() => null);
   const card = await page.evaluate(() => document.getElementById("notificaciones-titulo")?.closest("section")?.innerText.replace(/\s+/g, " ") ?? "");
   check("tarjeta «Notificaciones de pedidos» visible en el dashboard", /Notificaciones de pedidos/.test(card), card);
   // Con la clave pública VAPID en el build: botón para activar (no se pulsa: registraría

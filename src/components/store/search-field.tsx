@@ -1,153 +1,93 @@
 "use client";
 
-import { ArrowRight, LoaderCircle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  type FocusEvent,
-  type FormEvent,
-  type KeyboardEvent,
-  type ReactNode,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { type FormEvent, useEffect, useRef, useState, useTransition } from "react";
 
-import {
-  CATALOG_PATH,
-  type CatalogFilters,
-  catalogHref,
-  parseCatalogParams,
-  sanitizeSearch,
-} from "@/lib/catalog/filters";
-import { isLiveQuery, type LiveSearchItem, liveResultHref } from "@/lib/catalog/live-search";
+import { CATALOG_PATH, catalogHref, parseCatalogParams, sanitizeSearch } from "@/lib/catalog/filters";
+import { setCatalogNavigationPending } from "@/lib/catalog/navigation-pending";
 import { cn } from "@/lib/utils";
 
-import { LiveSearchOption } from "./live-search-option";
 import { Spinner } from "./pending-hint";
-import { useLiveSearchIndex } from "./use-live-search-index";
 
 type SearchFieldProps = { id: string; className?: string };
+
+/** Pausa al escribir antes de actualizar la URL (y consultar el servidor). */
+export const SEARCH_DEBOUNCE_MS = 250;
+/** Desde fuera del catálogo se navega a /productos a partir de 2 caracteres útiles. */
+const MIN_CHARS_OUTSIDE_CATALOG = 2;
 
 const inputClassName =
   "h-10 w-full rounded-lg border border-input bg-background-secondary pr-3 pl-9 text-base text-foreground transition-colors duration-150 placeholder:text-subtle-foreground hover:border-subtle-foreground/40 focus:bg-background md:text-sm";
 
-// Buscador del header (home y catálogo): búsqueda instantánea con Fuse.js
-// (autocomplete, patrón combobox de WAI-ARIA) + búsqueda completa con Enter o
-// "Ver todos" (/productos?q=, server-side). Desde /productos conserva categoría,
-// subcategoría, marca y orden; desde otras páginas empieza una búsqueda nueva.
+const usefulLength = (value: string) => value.replace(/[^\p{L}\p{N}]/gu, "").length;
+
+// Buscador del header: un input normal que FILTRA EL GRID de /productos (sin dropdown ni
+// overlays). Al escribir, tras una pausa corta, actualiza la URL (?q=, página 1) y el
+// servidor responde con la página filtrada; mientras tanto el grid anterior se queda,
+// atenuado. Desde otras páginas lleva a /productos?q=. La URL es la fuente de verdad
+// (refresh, atrás/adelante, compartir). El input nunca se remonta: conserva foco y teclado.
 export function SearchField({ id, className }: SearchFieldProps) {
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const onCatalog = pathname === CATALOG_PATH;
-  const current: CatalogFilters = onCatalog
-    ? parseCatalogParams(Object.fromEntries(searchParams.entries()))
-    : {};
-
-  // key: al navegar, el campo refleja la búsqueda de la URL.
-  return <LiveSearchField key={current.q ?? ""} id={id} className={className} current={current} />;
-}
-
-type ActiveOption = { type: "product"; item: LiveSearchItem } | { type: "all" };
-
-function LiveSearchField({ id, className, current }: SearchFieldProps & { current: CatalogFilters }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const onCatalog = pathname === CATALOG_PATH;
+  const urlQ = onCatalog ? (sanitizeSearch(searchParams.get("q") ?? undefined) ?? "") : "";
+
+  const [query, setQuery] = useState(urlQ);
+  // Último q de la URL ya reflejado y último q que envió ESTE campo.
+  const [syncedQ, setSyncedQ] = useState(urlQ);
+  const [sentQ, setSentQ] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [query, setQuery] = useState(current.q ?? "");
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const { status, search, load } = useLiveSearchIndex();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listboxId = `${id}-sugerencias`;
-  const optionId = (index: number) => `${id}-opcion-${index}`;
-  const statusId = useId();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const liveQuery = isLiveQuery(query);
-  const results = useMemo(() => (search && liveQuery ? search(query) : []), [search, liveQuery, query]);
-  // La última opción siempre es "Ver todos": lleva a la búsqueda completa.
-  const options: ActiveOption[] = useMemo(
-    () => [...results.map((item) => ({ type: "product" as const, item })), { type: "all" as const }],
-    [results],
-  );
-  const expanded = open && liveQuery;
+  // URL → input (atrás/adelante, chips, "Limpiar", el otro buscador). Si el cambio lo
+  // provocó este campo, no se pisa lo que el usuario siguió escribiendo.
+  if (urlQ !== syncedQ) {
+    setSyncedQ(urlQ);
+    if (urlQ === sentQ) setSentQ(null);
+    else setQuery(urlQ);
+  }
 
-  // El resultado activo con teclado siempre queda visible dentro del panel.
   useEffect(() => {
-    if (activeIndex >= 0) document.getElementById(optionId(activeIndex))?.scrollIntoView({ block: "nearest" });
-  });
+    setCatalogNavigationPending(id, isPending);
+    return () => setCatalogNavigationPending(id, false);
+  }, [id, isPending]);
 
-  function close() {
-    setOpen(false);
-    setActiveIndex(-1);
+  function go(clean: string) {
+    setSentQ(clean);
+    const current = onCatalog ? parseCatalogParams(Object.fromEntries(searchParams.entries())) : {};
+    // catalogHref sin página: una búsqueda nueva siempre empieza en la página 1.
+    const href = catalogHref({ ...current, q: clean || undefined });
+    startTransition(() => {
+      // En el catálogo: la primera búsqueda crea una entrada de historial (atrás vuelve al
+      // listado sin buscar); seguir escribiendo la reemplaza (sin una entrada por tecla).
+      if (onCatalog && urlQ) router.replace(href, { scroll: false });
+      else router.push(href, { scroll: !onCatalog });
+    });
   }
 
-  function navigate(href: string) {
-    close();
-    inputRef.current?.blur(); // cierra el teclado en móvil
-    startTransition(() => router.push(href));
-  }
+  // input → URL, con debounce.
+  useEffect(() => {
+    const clean = sanitizeSearch(query) ?? "";
+    if (clean === urlQ) return;
+    if (!onCatalog && usefulLength(clean) < MIN_CHARS_OUTSIDE_CATALOG) return;
+    timer.current = setTimeout(() => go(clean), SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+    // go depende de la URL actual, que ya está en las dependencias (urlQ / onCatalog).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, urlQ, onCatalog]);
 
-  function fullSearchHref() {
-    return catalogHref({ ...current, q: sanitizeSearch(query) });
-  }
-
-  function choose(option: ActiveOption) {
-    navigate(option.type === "product" ? liveResultHref(option.item, current) : fullSearchHref());
-  }
-
-  // Enter sin resultado activo: búsqueda completa (nunca elige el primero solo).
+  // Enter / botón "buscar" del teclado: sin esperar; cierra el teclado en móvil.
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    navigate(fullSearchHref());
+    if (timer.current) clearTimeout(timer.current);
+    const clean = sanitizeSearch(query) ?? "";
+    if (clean !== urlQ || !onCatalog) go(clean);
+    (event.currentTarget.elements.namedItem("q") as HTMLInputElement | null)?.blur();
   }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      if (!liveQuery) return;
-      event.preventDefault();
-      load();
-      if (!open) {
-        setOpen(true);
-        return;
-      }
-      const last = options.length - 1;
-      setActiveIndex((index) =>
-        event.key === "ArrowDown" ? (index >= last ? 0 : index + 1) : index <= 0 ? last : index - 1,
-      );
-    } else if (event.key === "Enter" && expanded && activeIndex >= 0 && options[activeIndex]) {
-      event.preventDefault();
-      choose(options[activeIndex]);
-    } else if (event.key === "Escape" && expanded) {
-      // Cierra el panel; el foco se queda en el campo.
-      event.preventDefault();
-      close();
-    }
-  }
-
-  // Cerrar cuando el foco sale del buscador (Tab, clic o toque fuera).
-  function handleBlur(event: FocusEvent<HTMLFormElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget)) close();
-  }
-
-  let panel: ReactNode = null;
-  if (expanded) {
-    if (status === "loading" || (status === "ready" && !search)) {
-      panel = <PanelMessage icon={<LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}>Buscando productos…</PanelMessage>;
-    } else if (status === "ready" && results.length === 0) {
-      panel = <PanelMessage>No encontramos productos para «{query.trim()}».</PanelMessage>;
-    }
-  }
-
-  const showListbox = expanded && (status === "ready" || status === "error");
-  const announcement = !expanded
-    ? ""
-    : status === "ready"
-      ? results.length === 0
-        ? `No encontramos productos para ${query.trim()}.`
-        : `${results.length} ${results.length === 1 ? "resultado" : "resultados"}. Usa las flechas para elegir.`
-      : "";
 
   return (
     <form
@@ -155,7 +95,6 @@ function LiveSearchField({ id, className, current }: SearchFieldProps & { curren
       action={CATALOG_PATH}
       method="get"
       onSubmit={handleSubmit}
-      onBlur={handleBlur}
       aria-busy={isPending}
       className={cn("relative", className)}
     >
@@ -164,90 +103,18 @@ function LiveSearchField({ id, className, current }: SearchFieldProps & { curren
       </label>
       <SearchIcon pending={isPending} />
       <input
-        ref={inputRef}
         id={id}
         name="q"
         type="search"
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={showListbox}
-        aria-controls={showListbox ? listboxId : undefined}
-        aria-activedescendant={showListbox && activeIndex >= 0 ? optionId(activeIndex) : undefined}
-        aria-describedby={statusId}
         value={query}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setOpen(true);
-          setActiveIndex(-1);
-          load();
-        }}
-        onFocus={() => {
-          load();
-          if (isLiveQuery(query)) setOpen(true);
-        }}
-        onKeyDown={handleKeyDown}
+        onChange={(event) => setQuery(event.target.value)}
         placeholder="Buscar productos..."
         enterKeyHint="search"
         autoComplete="off"
         maxLength={60}
         className={inputClassName}
       />
-      <p id={statusId} className="sr-only" aria-live="polite">
-        {announcement}
-      </p>
-
-      {expanded && (panel || showListbox) && (
-        <div className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-overlay">
-          {panel}
-          {showListbox && (
-            <ul
-              id={listboxId}
-              role="listbox"
-              aria-label="Sugerencias de productos"
-              className="max-h-[min(26rem,60dvh)] overflow-y-auto overscroll-contain py-1"
-            >
-              {results.map((item, index) => (
-                <LiveSearchOption
-                  key={item.id}
-                  id={optionId(index)}
-                  item={item}
-                  active={index === activeIndex}
-                  onHover={() => setActiveIndex(index)}
-                  onChoose={() => choose({ type: "product", item })}
-                />
-              ))}
-              {/* Búsqueda completa: siempre disponible, también si la búsqueda instantánea falló. */}
-              <li
-                id={optionId(results.length)}
-                role="option"
-                aria-selected={activeIndex === results.length}
-                // mousedown sin perder el foco del campo; la navegación ocurre en click (mouse y touch).
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose({ type: "all" })}
-                onMouseMove={() => setActiveIndex(results.length)}
-                className={cn(
-                  "mx-1 flex min-h-11 cursor-pointer items-center justify-between gap-2 rounded-lg px-3 text-sm font-medium text-primary",
-                  results.length > 0 && "mt-1",
-                  activeIndex === results.length ? "bg-primary-soft text-primary-dark" : "hover:bg-background-secondary",
-                )}
-              >
-                <span className="min-w-0 truncate">Ver todos los resultados para «{query.trim()}»</span>
-                <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
-              </li>
-            </ul>
-          )}
-        </div>
-      )}
     </form>
-  );
-}
-
-function PanelMessage({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
-  return (
-    <p className="flex items-center gap-2 border-b border-border-subtle px-4 py-3 text-sm text-muted-foreground">
-      {icon}
-      {children}
-    </p>
   );
 }
 

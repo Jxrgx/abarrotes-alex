@@ -51,9 +51,6 @@ try {
     text = await mainText(page);
     check(`${path}: error amigable con «Intentar de nuevo» (${response.status()})`, /No pudimos cargar/.test(text) && /Intentar de nuevo/.test(text) && !LEAK.test(text), text.slice(0, 160));
   }
-  const search = await fetch(`${BASE}/api/busqueda`);
-  const searchBody = await search.text();
-  check(`/api/busqueda caído → ${search.status} sin detalles internos`, search.status >= 500 && !LEAK.test(searchBody), searchBody.slice(0, 120));
   const cart = await fetch(`${BASE}/api/carrito`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ branchId: UUID, productIds: [UUID] }) });
   const cartBody = await cart.text();
   check(`/api/carrito caído → ${cart.status} sin detalles internos`, cart.status >= 500 && !LEAK.test(cartBody), cartBody.slice(0, 120));

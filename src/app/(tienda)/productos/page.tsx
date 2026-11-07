@@ -4,9 +4,10 @@ import Link from "next/link";
 
 import { type ActiveFilterChip, ActiveFilters, SubcategoryNav } from "@/components/store/catalog-chips";
 import { DesktopFilterControls, MobileFilterButton } from "@/components/store/catalog-filters";
+import { CatalogPagination } from "@/components/store/catalog-pagination";
+import { CatalogResults } from "@/components/store/catalog-results";
 import { CategoryNav } from "@/components/store/category-nav";
 import { EmptyState } from "@/components/store/empty-state";
-import { ProductFocus } from "@/components/store/product-focus";
 import { ProductGrid } from "@/components/store/product-list";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentBranch } from "@/lib/catalog/branches";
@@ -16,13 +17,13 @@ import {
   type CatalogFilters,
   catalogHref,
   matchesWordStart,
+  parseCatalogPage,
   parseCatalogParams,
-  parseProductFocus,
   resolveCatalogFilters,
   searchTerms,
   subcategoriesInScope,
 } from "@/lib/catalog/filters";
-import { getBranchFacets, getBranchProducts, sortProducts } from "@/lib/catalog/products";
+import { getBranchFacets, queryCatalog } from "@/lib/catalog/products";
 
 const DESCRIPTION =
   "Catálogo de Abarrotes Alex: busca y filtra bebidas, galletas, lácteos, botanas y limpieza con precios de la sucursal.";
@@ -39,8 +40,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/productos">
 export default async function ProductsPage({ searchParams }: PageProps<"/productos">) {
   const params = await searchParams;
   const raw = parseCatalogParams(params);
-  // ?producto=<id>: solo ayuda visual (scroll + resaltado) al venir de la búsqueda instantánea.
-  const focusProductId = parseProductFocus(params.producto);
+  const page = parseCatalogPage(params.page);
   const [branch, categories, subcategories, brands] = await Promise.all([
     getCurrentBranch(),
     getActiveCategories(),
@@ -80,17 +80,21 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
       .map((item) => item.id),
   }));
 
-  const [products, facets] = await Promise.all([
-    getBranchProducts(branch.id, {
+  // Una sola página (24) con el total real: filtro, orden global y conteo en PostgreSQL.
+  const [result, facets] = await Promise.all([
+    queryCatalog(branch.id, {
       categorySlug: category?.slug,
       subcategoryId: subcategory?.id,
       brandId: brand?.id,
       search,
+      order: filters.orden,
+      page,
     }),
     getBranchFacets(branch.id),
   ]);
-  const results = sortProducts(products, filters.orden);
+  const { items: results, total, totalPages } = result;
 
+  // Sin página: cualquier cambio de búsqueda/filtro/orden vuelve a la página 1.
   const href = (changes: Partial<CatalogFilters>) => catalogHref({ ...filters, ...changes });
   const clearHref = catalogHref({ orden: filters.orden });
 
@@ -120,8 +124,10 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
 
   const title = filters.q ? `Resultados para “${filters.q}”` : (category?.name ?? "Todos los productos");
   const scopeName = subcategory?.name ?? (filters.q ? category?.name : undefined);
-  const count = results.length === 1 ? "1 producto" : `${results.length} productos`;
+  const count = `${total === 1 ? "1 producto" : `${total} productos`}${filters.q ? ` para “${filters.q}”` : ""}`;
   const hasNonSearchFilters = Boolean(category || brand);
+  const pageOutOfRange = total > 0 && results.length === 0;
+  const catalogEmpty = total === 0 && !filters.q && !category && !brand;
   const filterProps = { filters, categories, subcategories, brands, facets };
 
   return (
@@ -133,6 +139,7 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
           <p className="text-sm text-muted-foreground" role="status">
             {count}
             {scopeName && ` en ${scopeName}`}
+            {totalPages > 1 && !pageOutOfRange && <span className="sr-only">. Página {page} de {totalPages}</span>}
           </p>
           <div className="md:hidden">
             <MobileFilterButton {...filterProps} />
@@ -178,13 +185,34 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
       </div>
 
       {results.length > 0 ? (
-        <section aria-labelledby="lista-productos">
-          <h2 id="lista-productos" className="sr-only">
-            Lista de productos
-          </h2>
+        <CatalogResults>
           <ProductGrid products={results} />
-          {focusProductId && <ProductFocus productId={focusProductId} />}
-        </section>
+          <CatalogPagination filters={filters} page={page} totalPages={totalPages} />
+        </CatalogResults>
+      ) : pageOutOfRange ? (
+        <EmptyState
+          icon={SearchX}
+          title="Esta página no existe"
+          description={`Hay ${totalPages} ${totalPages === 1 ? "página" : "páginas"} de resultados.`}
+          action={
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link href={catalogHref(filters)} className={buttonVariants()}>
+                Ir a la primera página
+              </Link>
+              {totalPages > 1 && (
+                <Link href={catalogHref(filters, totalPages)} className={buttonVariants({ variant: "secondary" })}>
+                  Ir a la última página
+                </Link>
+              )}
+            </div>
+          }
+        />
+      ) : catalogEmpty ? (
+        <EmptyState
+          icon={PackageSearch}
+          title="Aún no hay productos disponibles"
+          description="Pronto agregaremos productos a esta sucursal."
+        />
       ) : filters.q ? (
         <EmptyState
           icon={SearchX}
@@ -201,8 +229,11 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
                   Buscar en todos los productos
                 </Link>
               )}
-              <Link href={clearHref} className={buttonVariants({ variant: "secondary" })}>
-                Limpiar filtros
+              <Link href={href({ q: undefined })} className={buttonVariants({ variant: hasNonSearchFilters ? "secondary" : "primary" })}>
+                Limpiar búsqueda
+              </Link>
+              <Link href={catalogHref({})} className={buttonVariants({ variant: "secondary" })}>
+                Ver todos los productos
               </Link>
             </div>
           }

@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Capturas de las pruebas E2E (pueden contener datos de clientes)
 tests/e2e/.artifacts/
+
+# Artefactos generados del video promocional (Brag). No forman parte del código fuente.
+brag-output-*/

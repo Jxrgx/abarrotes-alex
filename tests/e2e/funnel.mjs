@@ -81,7 +81,7 @@ try {
   check("al final de la página el footer no queda bajo la barra", b && end.footerBottom <= b.top + 1, { ...end, barTop: b?.top });
   await page.evaluate(() => scrollTo(0, 0));
   // Escribiendo en la búsqueda (teclado abierto) la barra se oculta.
-  await page.evaluate(() => [...document.querySelectorAll("header input[role=combobox]")].find((e) => e.checkVisibility())?.focus());
+  await page.evaluate(() => [...document.querySelectorAll("header input[type=search]")].find((e) => e.checkVisibility())?.focus());
   await sleep(200);
   check("con la búsqueda enfocada la barra se oculta", (await bar(page)) === null);
   await page.evaluate(() => document.activeElement?.blur());

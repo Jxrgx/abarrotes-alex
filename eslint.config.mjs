@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Artefactos generados del video promocional (Brag): no son código fuente.
+    "brag-output-*/**",
   ]),
 ]);
 

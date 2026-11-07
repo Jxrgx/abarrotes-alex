@@ -11,7 +11,7 @@ const UUID = "11111111-1111-4111-8111-111111111111";
 const LEAK = /stack|at \w+ \(|postgres|relation |constraint|syntax error|select |insert |PGRST|node_modules|\\.next/i;
 
 console.log("== Headers de seguridad");
-for (const path of ["/", "/productos", "/carrito", "/checkout", "/admin/login", "/api/busqueda"]) {
+for (const path of ["/", "/productos", "/productos?q=cola&page=2", "/carrito", "/checkout", "/admin/login"]) {
   const response = await fetch(`${BASE}${path}`, { redirect: "manual" });
   const h = (name) => response.headers.get(name) ?? "";
   const csp = h("content-security-policy");

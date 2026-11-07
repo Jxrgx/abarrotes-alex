@@ -1,6 +1,8 @@
 import { normalizeSearchText } from "./normalize";
 
-// Estado del catálogo representado en la URL (/productos?q=&categoria=&subcategoria=&marca=&orden=).
+// Estado del catálogo representado en la URL (/productos?q=&categoria=&subcategoria=&marca=&orden=&page=).
+// `page` NO forma parte de CatalogFilters: cualquier href construido con filtros vuelve a la
+// página 1 automáticamente; solo la paginación agrega `page` (catalogHref(filters, page)).
 // Módulo puro: lo usan tanto Server Components como los Client Components de filtros.
 
 export const CATALOG_PATH = "/productos";
@@ -80,8 +82,20 @@ export function parseCatalogParams(params: SearchParamsRecord): CatalogFilters {
   };
 }
 
-// URL canónica con orden de parámetros estable. Valores vacíos se omiten.
-export function catalogHref(filters: CatalogFilters) {
+// ?page=N: entero ≥ 1. Repetido → el primero (misma convención que los demás); inválido
+// ("abc", "0", "-2", "1.5", enorme) → página 1. Una página mayor que el total se resuelve
+// en la página (estado amigable, nunca 500).
+const MAX_PAGE = 100_000;
+
+export function parseCatalogPage(value: string | string[] | undefined) {
+  const raw = first(value);
+  if (!raw || !/^\d{1,6}$/.test(raw)) return 1;
+  const page = Number(raw);
+  return page >= 1 && page <= MAX_PAGE ? page : 1;
+}
+
+// URL canónica con orden de parámetros estable. Valores vacíos se omiten; page solo si > 1.
+export function catalogHref(filters: CatalogFilters, page = 1) {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
   if (filters.categoria) params.set("categoria", filters.categoria);
@@ -89,24 +103,9 @@ export function catalogHref(filters: CatalogFilters) {
   if (filters.categoria && filters.subcategoria) params.set("subcategoria", filters.subcategoria);
   if (filters.marca) params.set("marca", filters.marca);
   if (filters.orden) params.set("orden", filters.orden);
+  if (page > 1) params.set("page", String(page));
   const query = params.toString();
   return query ? `${CATALOG_PATH}?${query}` : CATALOG_PATH;
-}
-
-// ?producto=<id>: ayuda visual de navegación (scroll + resaltado de una tarjeta)
-// al elegir un resultado de la búsqueda instantánea. No filtra, no cambia precios
-// ni disponibilidad. Un valor que no sea UUID se ignora.
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function parseProductFocus(value: string | string[] | undefined) {
-  const id = first(value)?.toLowerCase();
-  return id && UUID_PATTERN.test(id) ? id : undefined;
-}
-
-export function productFocusHref(filters: CatalogFilters, productId: string) {
-  const href = catalogHref(filters);
-  const separator = href.includes("?") ? "&" : "?";
-  return `${href}${separator}producto=${encodeURIComponent(productId)}`;
 }
 
 // ---------------------------------------------------------------------------

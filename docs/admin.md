@@ -381,10 +381,7 @@ id, slug (se genera del nombre nuevo), fechas ni imagen. Aviso: "Producto duplic
 
 Cada mutación revalida `/admin/productos`, las tres rutas del catálogo admin (conteos),
 `/` (destacados) y `/productos`. La tienda no usa caché, así que producto nuevo, precio,
-agotado, inactivo y destacado se ven en la siguiente visita. El índice de la búsqueda
-instantánea (`/api/busqueda`) se calcula en cada petición, pero el navegador lo guarda
-hasta 60 s (`max-age=60`) y se pide una vez por visita: un cambio aparece en la búsqueda
-instantánea como máximo ~1 minuto después. No se modificó Fuse.
+agotado, inactivo y destacado se ven en la siguiente visita. La búsqueda del catálogo es server-side (sin índice en el navegador): un cambio se ve en la siguiente consulta.
 
 ### Multisucursal
 

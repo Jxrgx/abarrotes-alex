@@ -19,7 +19,7 @@ function supabaseHost() {
     return "";
   }
 }
-const EMPTY_TABLES = new Set(["products", "branch_products", "promotions", "orders"]);
+const EMPTY_TABLES = new Set(["products", "branch_products", "catalog_items", "promotions", "orders"]);
 
 function mode() {
   try {
