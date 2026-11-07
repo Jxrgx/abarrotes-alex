@@ -74,6 +74,13 @@ export async function saveProduct(formData: FormData): Promise<MutationResult> {
       branch_id: branch.branchId,
       price: branch.price,
       is_available: branch.isAvailable,
+      // Conjunto COMPLETO de niveles: los no enviados se borran en la misma transacción.
+      wholesale: branch.wholesale.map((tier) => ({
+        id: tier.id,
+        min_quantity: tier.minQuantity,
+        max_quantity: tier.maxQuantity,
+        unit_price: tier.unitPrice,
+      })),
     })),
   });
   if (error) return failure(error.code);

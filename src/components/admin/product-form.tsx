@@ -25,7 +25,10 @@ import { formatPresentation } from "@/lib/format";
 import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/utils";
 
+import { WHOLESALE_MESSAGES } from "@/lib/admin/wholesale-forms";
+
 import { ActiveField, WarningNote } from "./catalog-form";
+import { WholesaleEditor } from "./wholesale-editor";
 
 export type ProductFormMode = "create" | "edit" | "duplicate";
 
@@ -58,6 +61,11 @@ export function ProductFields({ mode, source, options, fieldErrors, pending = fa
   const brands = options.brands.filter((item) => item.isActive || item.id === source?.brandId);
   // Sucursales activas y las que ya tienen precio para este producto (multisucursal).
   const branches = options.branches.filter((branch) => branch.isActive || source?.prices[branch.id]);
+  // Precio normal por sucursal (lo comparten la fila de precio y el editor de mayoreo).
+  const [prices, setPrices] = useState<Record<string, string>>(() =>
+    Object.fromEntries(branches.map((branch) => [branch.id, source?.prices[branch.id]?.price ?? ""])),
+  );
+  const savedTiers = branches.reduce((total, branch) => total + (source?.prices[branch.id]?.wholesale.length ?? 0), 0);
 
   const slug = slugify(name);
   const slugChanges = editing && source && slug && slug !== source.slug;
@@ -218,11 +226,46 @@ export function ProductFields({ mode, source, options, fieldErrors, pending = fa
         ) : (
           <ul className="space-y-3">
             {branches.map((branch) => (
-              <BranchPriceRow key={branch.id} branch={branch} price={source?.prices[branch.id]} error={fieldErrors[`price:${branch.id}`]} />
+              <BranchPriceRow
+                key={branch.id}
+                branch={branch}
+                price={source?.prices[branch.id]}
+                value={prices[branch.id] ?? ""}
+                onValueChange={(value) => setPrices((current) => ({ ...current, [branch.id]: value }))}
+                error={fieldErrors[`price:${branch.id}`]}
+              />
             ))}
           </ul>
         )}
         {fieldErrors.branches && <p className="text-sm text-destructive-strong">{fieldErrors.branches}</p>}
+      </Section>
+
+      <Section title="Precios por mayoreo" description="Define precios especiales según la cantidad comprada.">
+        {saleType === "weight" ? (
+          <>
+            <div className="flex items-start gap-2 rounded-lg bg-background-secondary p-3 text-sm text-muted-foreground">
+              <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <p>{WHOLESALE_MESSAGES.weight} La venta por peso tendrá sus propias reglas en una fase futura.</p>
+            </div>
+            {editing && savedTiers > 0 && (
+              <WarningNote>
+                Al guardar como venta por peso se eliminarán {savedTiers === 1 ? "el precio" : `los ${savedTiers} precios`} por mayoreo de este producto.
+              </WarningNote>
+            )}
+          </>
+        ) : (
+          branches.map((branch) => (
+            <WholesaleEditor
+              key={branch.id}
+              branchId={branch.id}
+              branchName={branches.length > 1 ? branch.name : undefined}
+              normalPrice={prices[branch.id] ?? ""}
+              initial={mode === "create" ? [] : (source?.prices[branch.id]?.wholesale ?? [])}
+              keepIds={editing}
+              fieldErrors={fieldErrors}
+            />
+          ))
+        )}
       </Section>
 
       <Section title="Visibilidad">
@@ -246,12 +289,13 @@ export function ProductFields({ mode, source, options, fieldErrors, pending = fa
 }
 
 // Precio + Disponible/Agotado de una sucursal. Una fila por sucursal: hoy hay una.
-function BranchPriceRow({ branch, price, error }: {
+function BranchPriceRow({ branch, price, value, onValueChange, error }: {
   branch: ProductFormOptions["branches"][number];
   price: AdminProduct["prices"][string] | undefined;
+  value: string;
+  onValueChange: (value: string) => void;
   error?: string;
 }) {
-  const [value, setValue] = useState(price?.price ?? "");
   const [available, setAvailable] = useState(price?.isAvailable ?? true);
   const id = `precio-${branch.id}`;
   const cents = priceToCents(value);
@@ -276,7 +320,7 @@ function BranchPriceRow({ branch, price, error }: {
               autoComplete="off"
               placeholder="0.00"
               value={value}
-              onChange={(event) => setValue(event.target.value)}
+              onChange={(event) => onValueChange(event.target.value)}
               aria-invalid={error ? true : undefined}
               aria-describedby={fieldDescribedBy(id, { error })}
               className={cn(controlClassName, "h-11 pr-14 pl-7 tabular-nums")}

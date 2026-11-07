@@ -1,6 +1,6 @@
 import "server-only";
 
-import { toCents } from "@/lib/catalog/pricing";
+import { toCents, type PricingType } from "@/lib/catalog/pricing";
 import { PENDING_ORDER_STATUSES, type DeliveryType, type OrderStatus } from "@/lib/orders/status";
 import { createClient } from "@/lib/supabase/server";
 
@@ -103,7 +103,16 @@ export type AdminOrderDetail = {
   subtotalCents: number;
   shippingCents: number | null;
   totalCents: number;
-  items: { id: string; name: string; presentation: string | null; quantity: number; unitPriceCents: number; subtotalCents: number }[];
+  items: {
+    id: string;
+    name: string;
+    presentation: string | null;
+    quantity: number;
+    unitPriceCents: number;
+    subtotalCents: number;
+    /** Regla con la que se cobró; null en pedidos anteriores al mayoreo. */
+    pricingType: PricingType | null;
+  }[];
   history: { id: string; previousStatus: OrderStatus | null; newStatus: OrderStatus; changedBy: string | null; createdAt: string }[];
 };
 
@@ -116,7 +125,7 @@ export async function getAdminOrder(id: string): Promise<AdminOrderDetail | null
       `id, folio, status, delivery_type, created_at, customer_name, customer_phone, address, neighborhood, address_references,
        payment_method, cash_amount, customer_notes, subtotal, shipping_cost, total,
        branch:branches!inner ( name ),
-       order_items ( id, product_name, product_presentation, quantity, unit_price, subtotal, created_at ),
+       order_items ( id, product_name, product_presentation, quantity, unit_price, subtotal, pricing_type, created_at ),
        order_status_history ( id, previous_status, new_status, changed_by, created_at )`,
     )
     .eq("id", id)
@@ -151,6 +160,7 @@ export async function getAdminOrder(id: string): Promise<AdminOrderDetail | null
         quantity: Number(item.quantity),
         unitPriceCents: toCents(item.unit_price),
         subtotalCents: toCents(item.subtotal),
+        pricingType: item.pricing_type,
       })),
     history: [...data.order_status_history]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))

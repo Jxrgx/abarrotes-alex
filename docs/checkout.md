@@ -40,8 +40,12 @@ al campo correspondiente, nunca el código.
 
 ## Resumen
 
-Productos con cantidad e importe (precios actuales del catálogo), **Subtotal**,
-**Envío: Por confirmar** y **Total parcial** (no "Total", para no sugerir envío $0).
+Productos con cantidad e importe (precios actuales del catálogo, **por cantidad**:
+incluye mayoreo con una etiqueta discreta «Mayoreo · $X c/u»; «Oferta» solo si gana la
+promoción), **Subtotal**, **Envío: Por confirmar** y **Total parcial** (no "Total", para
+no sugerir envío $0). La confirmación muestra «Precio mayoreo» desde el snapshot del
+comprobante (`pricing_type`), sin consultar reglas actuales; WhatsApp usa los importes del
+comprobante. Ver [wholesale.md](wholesale.md).
 
 ## clientRequestId
 

@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { type PriceRules, resolveUnitPrice } from "@/lib/catalog/pricing";
 import { cartCount } from "@/lib/cart/reducer";
 import {
   announceCart,
@@ -11,6 +12,7 @@ import {
   getCartSnapshot,
   useCartQuantity,
 } from "@/lib/cart/store";
+import { formatCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import { QuantityStepper } from "./quantity-stepper";
@@ -20,13 +22,27 @@ type AddToCartProps = {
   branchId: string;
   /** Nombre + presentación, para etiquetas y anuncios. */
   label: string;
+  /** Reglas de precio si el producto tiene mayoreo (para anunciar cuando aplica o deja de aplicar). */
+  rules?: PriceRules;
   className?: string;
 };
+
+// Solo cuando cambia el precio por mayoreo (no en cada clic): entra, cambia de nivel o sale.
+function wholesaleChange(rules: PriceRules | undefined, from: number, to: number) {
+  if (!rules) return "";
+  const before = resolveUnitPrice(rules, from);
+  const after = resolveUnitPrice(rules, to);
+  if (after.pricingType === "wholesale" && after.unitCents !== before.unitCents) {
+    return ` Precio mayoreo aplicado: ${formatCents(after.unitCents)} cada uno.`;
+  }
+  if (before.pricingType === "wholesale" && after.pricingType !== "wholesale") return " Ya no aplica el precio mayoreo.";
+  return "";
+}
 
 // Acción de la tarjeta de producto. Solo se usa con productos disponibles; los
 // agotados muestran un botón deshabilitado del lado del servidor.
 // "Agregar" se transforma en [−] n [+] (feedback visible) y se anuncia el cambio.
-export function AddToCart({ productId, branchId, label, className }: AddToCartProps) {
+export function AddToCart({ productId, branchId, label, rules, className }: AddToCartProps) {
   const quantity = useCartQuantity(productId);
 
   function announce(message: string) {
@@ -58,12 +74,12 @@ export function AddToCart({ productId, branchId, label, className }: AddToCartPr
       label={label}
       onIncrement={() => {
         if (dispatchCart({ type: "increment", productId, available: true })) {
-          announce(`${label}: ${quantity + 1} en el carrito.`);
+          announce(`${label}: ${quantity + 1} en el carrito.${wholesaleChange(rules, quantity, quantity + 1)}`);
         }
       }}
       onDecrement={() => {
         if (dispatchCart({ type: "decrement", productId })) {
-          announce(`${label}: ${quantity - 1} en el carrito.`);
+          announce(`${label}: ${quantity - 1} en el carrito.${wholesaleChange(rules, quantity, quantity - 1)}`);
         }
       }}
       onRemove={() => {

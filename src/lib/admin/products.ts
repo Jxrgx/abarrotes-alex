@@ -10,6 +10,17 @@ import type { ProductUnit, SaleType } from "./product-forms";
 // admin: incluye inactivos). Producto + subcategoría + categoría + marca + precios
 // por sucursal + promociones en UNA consulta (embeds de PostgREST), sin N+1.
 
+/** Nivel de mayoreo tal como está guardado (incluye los que requieren revisión). */
+export type AdminWholesaleTier = {
+  id: string;
+  minQuantity: number;
+  /** null = sin límite. */
+  maxQuantity: number | null;
+  unitPriceCents: number;
+  /** Texto para el formulario ("20.00"). */
+  unitPrice: string;
+};
+
 export type AdminBranchPrice = {
   /** id de branch_products (acciones rápidas de disponibilidad). */
   id: string;
@@ -20,6 +31,8 @@ export type AdminBranchPrice = {
   isAvailable: boolean;
   /** Promoción vigente más baja (puede no aplicar si no es menor al precio). */
   promoCents: number | null;
+  /** Niveles de mayoreo por cantidad mínima. Los que no son menores al precio requieren revisión. */
+  wholesale: AdminWholesaleTier[];
 };
 
 export type AdminProduct = {
@@ -79,7 +92,8 @@ export async function listAdminProducts(): Promise<AdminProduct[]> {
       `id, name, slug, is_active, is_featured, presentation, unit, sale_type, image_path, subcategory_id, brand_id,
        subcategory:subcategories!inner ( name, is_active, sort_order, category:categories!inner ( id, name, is_active, sort_order ) ),
        brand:brands ( name, is_active ),
-       branch_products ( id, branch_id, price, is_available, promotions ( promotional_price, starts_at, ends_at, is_active ) )`,
+       branch_products ( id, branch_id, price, is_available, promotions ( promotional_price, starts_at, ends_at, is_active ),
+         wholesale_prices ( id, min_quantity, max_quantity, unit_price ) )`,
     )
     .order("name");
   if (error) queryError("los productos", error.code);
@@ -119,6 +133,15 @@ export async function listAdminProducts(): Promise<AdminProduct[]> {
               price: (toCents(bp.price) / 100).toFixed(2),
               isAvailable: bp.is_available,
               promoCents: currentPromoCents(bp.promotions, now),
+              wholesale: [...bp.wholesale_prices]
+                .sort((a, b) => a.min_quantity - b.min_quantity)
+                .map((tier) => ({
+                  id: tier.id,
+                  minQuantity: tier.min_quantity,
+                  maxQuantity: tier.max_quantity,
+                  unitPriceCents: toCents(tier.unit_price),
+                  unitPrice: (toCents(tier.unit_price) / 100).toFixed(2),
+                })),
             },
           ]),
         ),

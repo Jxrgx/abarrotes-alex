@@ -59,7 +59,7 @@ describe("parseProductForm", () => {
     assert.ok(result.ok);
     assert.deepEqual(result.data, {
       id: undefined, name: "Refresco de cola", subcategoryId: SUB, brandId: BRAND, presentation: "600", unit: "ml",
-      saleType: "unit", isFeatured: false, isActive: true, branches: [{ branchId: BRANCH, price: "18.50", isAvailable: true }],
+      saleType: "unit", isFeatured: false, isActive: true, branches: [{ branchId: BRANCH, price: "18.50", isAvailable: true, wholesale: [] }],
     });
   });
   test("sin marca → brandId null; sin presentación → ambas null", () => {
@@ -94,7 +94,7 @@ describe("parseProductForm", () => {
   test("precio 0 permitido; disponibilidad agotado; destacado", () => {
     const result = parseProductForm(form({ [`price:${BRANCH}`]: "0", [`available:${BRANCH}`]: "false", isFeatured: "on" }));
     assert.ok(result.ok);
-    assert.deepEqual(result.data.branches, [{ branchId: BRANCH, price: "0.00", isAvailable: false }]);
+    assert.deepEqual(result.data.branches, [{ branchId: BRANCH, price: "0.00", isAvailable: false, wholesale: [] }]);
     assert.equal(result.data.isFeatured, true);
   });
   test("varias sucursales (multisucursal)", () => {

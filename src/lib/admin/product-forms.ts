@@ -1,12 +1,13 @@
 import { z } from "zod";
 
-import { decimalToCents } from "@/lib/catalog/pricing";
 import { normalizeSearchText } from "@/lib/catalog/normalize";
 import { slugify } from "@/lib/slug";
 import { Constants, type Database } from "@/types/database";
 
 import type { FieldErrors } from "./catalog-forms";
 import { parseImageIntent } from "./image-rules";
+import { normalizePrice, priceToCents } from "./price-input";
+import { parseWholesaleTiers, WHOLESALE_MESSAGES, type WholesaleTierInput } from "./wholesale-forms";
 
 // Validación del formulario de productos (Fase 8C.1). Pura: la usan la Server
 // Action (autoridad) y el cliente (solo UX). Precios y presentación viajan como
@@ -24,7 +25,13 @@ export const SALE_TYPE_LABELS: Record<SaleType, string> = { unit: "Por unidad", 
 export const PRODUCT_NAME_MAX = 100;
 export const PRICE_MAX_CENTS = 99_999_99; // $99,999.99
 
-export type BranchPriceInput = { branchId: string; price: string; isAvailable: boolean };
+export type BranchPriceInput = {
+  branchId: string;
+  price: string;
+  isAvailable: boolean;
+  /** Niveles de mayoreo de esta sucursal (vacío en venta por peso: se eliminan). */
+  wholesale: WholesaleTierInput[];
+};
 export type ProductInput = {
   id?: string;
   name: string;
@@ -39,24 +46,7 @@ export type ProductInput = {
   branches: BranchPriceInput[];
 };
 
-// "$1,234.5" → "1234.50"; null si no es un precio válido (0 a 99,999.99, máx. 2 decimales).
-export function normalizePrice(raw: string): string | null {
-  let value = raw.trim().replace(/^\$/, "").trim();
-  // La coma solo como separador de miles bien formado ("1,234.50"); "18,50" se rechaza
-  // en lugar de interpretarse como 1850.
-  if (value.includes(",")) {
-    if (!/^\d{1,3}(,\d{3})+(\.\d*)?$/.test(value)) return null;
-    value = value.replace(/,/g, "");
-  }
-  const match = /^(\d{1,5})(?:\.(\d{0,2}))?$/.exec(value);
-  if (!match) return null;
-  return `${Number(match[1])}.${(match[2] ?? "").padEnd(2, "0")}`;
-}
-
-export function priceToCents(raw: string): number | null {
-  const normalized = normalizePrice(raw);
-  return normalized === null ? null : decimalToCents(normalized);
-}
+export { normalizePrice, priceToCents };
 
 // "1.50" → "1.5"; null si no es una cantidad válida (> 0, máx. 3 decimales).
 export function normalizePresentation(raw: string): string | null {
@@ -122,7 +112,13 @@ export function parseProductForm(formData: FormData):
     const price = normalizePrice(value);
     if (!value.trim()) errors[key] = "Escribe el precio.";
     else if (price === null) errors[key] = "Escribe un precio válido entre 0 y 99,999.99 (p. ej. 18.50).";
-    branches.push({ branchId, price: price ?? "", isAvailable: text(formData, `available:${branchId}`) !== "false" });
+    branches.push({
+      branchId,
+      price: price ?? "",
+      isAvailable: text(formData, `available:${branchId}`) !== "false",
+      // Mayoreo solo para venta por unidad; por peso se guardan cero niveles.
+      wholesale: saleType === "weight" ? [] : parseWholesaleTiers(formData, branchId, value, errors),
+    });
   }
   if (branches.length === 0) errors.branches = "Indica el precio en al menos una sucursal.";
 
@@ -162,6 +158,18 @@ export function productMutationError(code: string | undefined): { message: strin
     case "23514":
     case "22023":
       return { message: "Revisa los datos del formulario." };
+    // Precios por mayoreo (triggers y constraints de wholesale_prices).
+    case "WHL01":
+      return { message: WHOLESALE_MESSAGES.notLower };
+    case "WHL02":
+      return { message: WHOLESALE_MESSAGES.weight };
+    case "WHL03":
+      return { message: WHOLESALE_MESSAGES.increasing };
+    case "23P01":
+      return { message: WHOLESALE_MESSAGES.overlap };
+    case "WHL04":
+    case "WHL05":
+      return { message: WHOLESALE_MESSAGES.stale };
     default:
       return { message: "No pudimos guardar los cambios. Inténtalo de nuevo." };
   }

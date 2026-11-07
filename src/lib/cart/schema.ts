@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { WholesaleTier } from "@/lib/catalog/pricing";
+
 // Formato persistido en localStorage (ver docs/cart.md). Solo ids y cantidades:
 // nombre, precio y promoción SIEMPRE se obtienen del catálogo actual.
 
@@ -94,6 +96,8 @@ export type CartProductInfo = {
   isAvailable: boolean;
   priceCents: number;
   promoPriceCents: number | null;
+  /** Niveles de mayoreo aplicables; el precio por cantidad se calcula con resolveUnitPrice. */
+  wholesaleTiers: WholesaleTier[];
 };
 
 export type CartResolveResponse = {

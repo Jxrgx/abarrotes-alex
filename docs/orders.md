@@ -66,23 +66,31 @@ Orden interno:
 Los productos inválidos **no se eliminan en silencio**: se rechaza el pedido con
 los `productIds` afectados para que el checkout pida corregir el carrito.
 
-## Precios y promociones
+## Precios, promociones y mayoreo
 
-- Precio efectivo por partida: la promoción **vigente de menor precio** que sea menor
-  al precio normal; si no hay, `branch_products.price`. Vigente = `is_active` y dentro
-  de `starts_at`/`ends_at` (misma regla que la RLS y el catálogo).
+- Precio efectivo por partida (`private.line_price`, migración `…20261108000100`): el
+  **mejor** entre el precio normal, la promoción **vigente de menor precio** (si es menor al
+  normal) y el **nivel de mayoreo** cuyo rango contiene la cantidad de esa partida (si es
+  menor al normal; solo productos por unidad). El nivel aplica a **toda** la partida.
+  Empate promoción = mayoreo → `promotion`. Vigente = `is_active` y dentro de
+  `starts_at`/`ends_at` (misma regla que la RLS y el catálogo). Ver
+  [wholesale.md](wholesale.md).
+- `order_items.pricing_type` (`normal` · `promotion` · `wholesale`) guarda qué regla se
+  cobró. El navegador envía solo ids y cantidades: precios o tipos que agregue se ignoran.
 - `order_items.subtotal = round(unit_price × quantity, 2)`; `orders.subtotal` = suma
   de las partidas insertadas (los precios se leen una sola vez).
 - Envío: `shipping_cost = NULL` ("por confirmar") y `total = subtotal` (total conocido).
 - Todo en `numeric`. La respuesta envía montos como texto (`"1512.50"`) y Next.js los
   convierte a centavos enteros sin punto flotante.
 - `expectedSubtotalCents` (opcional): si no coincide con el recalculado se rechaza con
-  `PRICE_CHANGED` y el subtotal real, para que el cliente confirme el nuevo monto.
+  `PRICE_CHANGED` y el subtotal real, para que el cliente confirme el nuevo monto. Incluye
+  cambios de mayoreo entre el carrito y la confirmación.
 
 ## Snapshot en order_items
 
 Se guarda nombre, presentación formateada (`"600 ml"`, `"12 piezas"`), precio
-unitario, cantidad y subtotal del momento. Cambios futuros del catálogo no alteran
+unitario, cantidad, subtotal y `pricing_type` del momento (NULL solo en partidas
+anteriores al mayoreo; el comprobante lo incluye por partida). Cambios futuros del catálogo no alteran
 pedidos (ver [database.md](database.md)).
 
 ## Folios

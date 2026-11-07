@@ -331,7 +331,20 @@ function PriceCell({ price }: { price: AdminProduct["prices"][string] | undefine
           {formatCents(price.promoCents!)}
         </span>
       )}
+      <WholesaleSummary price={price} />
     </span>
+  );
+}
+
+// "Mayoreo desde 3" o, si algún nivel ya no es menor al precio normal, "Mayoreo: revisar"
+// (la tienda lo ignora hasta corregirlo; mismo criterio que las promociones).
+function WholesaleSummary({ price }: { price: AdminProduct["prices"][string] }) {
+  if (price.wholesale.length === 0) return null;
+  const review = price.wholesale.some((tier) => tier.unitPriceCents >= price.priceCents);
+  return review ? (
+    <span className="block text-xs font-medium text-warning-strong">Mayoreo: requiere revisión</span>
+  ) : (
+    <span className="block text-xs text-primary-dark">Mayoreo desde {price.wholesale[0].minQuantity} pzas</span>
   );
 }
 

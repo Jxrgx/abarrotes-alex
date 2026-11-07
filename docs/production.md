@@ -64,6 +64,24 @@ Realtime/Push. `realtime.messages` no se limpió: Realtime lo purga solo y solo 
 - Pendientes que no cambian: eliminar la cuenta admin de desarrollo (§10),
   `SEARCH_INDEXING_ENABLED` sigue en `false`, y los horarios son los del seed.
 
+### Precios por mayoreo (preparado antes de la carga del catálogo)
+
+Migración `20261108000100_wholesale_prices.sql` ([wholesale.md](wholesale.md)): **solo
+estructura** (tabla, constraints, RLS, funciones, `create_order`, `admin_save_product` y
+vista), sin datos. Estado: **aplicada en remoto el 2026-11-07** con autorización (16
+migraciones, local = remoto). Verificado: huellas md5 de productos, precios, categorías,
+subcategorías, promociones, imágenes, sucursal/horarios y perfiles idénticas antes y después;
+0 niveles de mayoreo; 0 pedidos y folio sin consumir (`last_value 1`, `is_called false`);
+RLS y privilegios de `wholesale_prices` correctos; la app desplegada (código anterior)
+sigue funcionando con la base migrada. Pendiente: **deploy de la app** con el código de
+mayoreo. Orden
+obligatorio: **1) migración (hecha), 2) deploy de la app** (el código nuevo lee
+`catalog_items.wholesale_tiers` y `order_items.pricing_type`). No inserta ni modifica datos:
+los productos ya cargados quedan sin niveles de mayoreo hasta que el admin los defina.
+
+Carga del catálogo real: **iniciada desde el panel el 2026-11-07** (al revisar el dry-run de
+mayoreo había 3 productos, 2 categorías, 2 subcategorías y 3 promociones; 0 pedidos).
+
 Las secciones §1–§5 y §19–§20 describen el estado **anterior** a esta limpieza y quedan como
 referencia histórica.
 

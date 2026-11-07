@@ -2,7 +2,7 @@ import "server-only";
 
 import type { PostgrestError } from "@supabase/supabase-js";
 
-import { decimalToCents } from "@/lib/catalog/pricing";
+import { decimalToCents, type PricingType } from "@/lib/catalog/pricing";
 import { getPublicSupabase } from "@/lib/supabase/public";
 
 import {
@@ -114,6 +114,7 @@ type DbReceipt = {
     unit_price: string;
     quantity: number;
     subtotal: string;
+    pricing_type?: PricingType | null;
   }[];
 };
 
@@ -137,6 +138,7 @@ function toReceipt(receipt: DbReceipt): OrderReceipt {
       unitPriceCents: decimalToCents(item.unit_price),
       quantity: item.quantity,
       subtotalCents: decimalToCents(item.subtotal),
+      pricingType: item.pricing_type ?? null,
     })),
   };
 }

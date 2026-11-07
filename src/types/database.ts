@@ -197,6 +197,7 @@ export type Database = {
           order_id: string
           product_id: string
           product_name: string
+          pricing_type: Database["public"]["Enums"]["pricing_type"] | null
           product_presentation: string | null
           quantity: number
           subtotal: number
@@ -207,6 +208,7 @@ export type Database = {
           id?: string
           order_id: string
           product_id: string
+          pricing_type?: Database["public"]["Enums"]["pricing_type"] | null
           product_name: string
           product_presentation?: string | null
           quantity: number
@@ -218,6 +220,7 @@ export type Database = {
           id?: string
           order_id?: string
           product_id?: string
+          pricing_type?: Database["public"]["Enums"]["pricing_type"] | null
           product_name?: string
           product_presentation?: string | null
           quantity?: number
@@ -576,6 +579,44 @@ export type Database = {
           },
         ]
       }
+      wholesale_prices: {
+        Row: {
+          branch_product_id: string
+          created_at: string
+          id: string
+          max_quantity: number | null
+          min_quantity: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          branch_product_id: string
+          created_at?: string
+          id?: string
+          max_quantity?: number | null
+          min_quantity: number
+          unit_price: number
+          updated_at?: string
+        }
+        Update: {
+          branch_product_id?: string
+          created_at?: string
+          id?: string
+          max_quantity?: number | null
+          min_quantity?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wholesale_prices_branch_product_id_fkey"
+            columns: ["branch_product_id"]
+            isOneToOne: false
+            referencedRelation: "branch_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       catalog_items: {
@@ -606,6 +647,8 @@ export type Database = {
           subcategory_slug: string
           subcategory_sort_order: number
           unit: Database["public"]["Enums"]["product_unit"] | null
+          /** [{ min, max, price }] por cantidad mínima; null si no hay mayoreo. */
+          wholesale_tiers: Json | null
         }
         Relationships: []
       }
@@ -696,6 +739,7 @@ export type Database = {
         | "delivered"
         | "cancelled"
       payment_method: "cash"
+      pricing_type: "normal" | "promotion" | "wholesale"
       product_unit: "ml" | "L" | "g" | "kg" | "pieza"
       sale_type: "unit" | "weight"
       user_role: "admin" | "employee"
@@ -838,6 +882,7 @@ export const Constants = {
         "cancelled",
       ],
       payment_method: ["cash"],
+      pricing_type: ["normal", "promotion", "wholesale"],
       product_unit: ["ml", "L", "g", "kg", "pieza"],
       sale_type: ["unit", "weight"],
       user_role: ["admin", "employee"],

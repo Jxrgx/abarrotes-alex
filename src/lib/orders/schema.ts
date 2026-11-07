@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { PricingType } from "@/lib/catalog/pricing";
+
 // Contrato de creación de pedidos (POST /api/pedidos). Módulo puro: el checkout
 // (Fase 6B) puede reutilizar este esquema en el formulario, pero la validación
 // que cuenta es la del servidor y, al final, la de public.create_order.
@@ -98,6 +100,8 @@ export type OrderReceipt = {
     unitPriceCents: number;
     quantity: number;
     subtotalCents: number;
+    /** Regla con la que se cobró (snapshot de la base). Ausente en comprobantes antiguos. */
+    pricingType?: PricingType | null;
   }[];
 };
 

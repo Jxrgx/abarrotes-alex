@@ -345,6 +345,15 @@ Diálogo grande (máx. 672px; hoja a pantalla casi completa en móvil) con secci
 - Slug regenerado desde el nombre con `slugify` (vista previa discreta); colisión →
   "Ya existe un producto con ese nombre." junto al nombre.
 
+### Precios por mayoreo
+
+Sección **«Precios por mayoreo»** después de «Precio y disponibilidad» (editor por
+sucursal: Desde · Hasta / Sin límite · Precio por pieza, ahorro en vivo, «+ Agregar precio
+por mayoreo»). Se guarda en la **misma** llamada a `admin_save_product` (clave
+`wholesale` por sucursal; transacción única). Oculto para venta por peso (con aviso si se
+eliminarán niveles). El listado muestra «Mayoreo desde N pzas» o «Mayoreo: requiere
+revisión». Reglas, errores y «Requiere revisión» en [wholesale.md](wholesale.md).
+
 ### Promociones existentes
 
 No se editan en esta fase. Si el nuevo precio deja una promoción vigente ≥ precio, el
@@ -472,8 +481,9 @@ Responde "¿qué pedidos tengo que atender y qué hago con cada uno?". No es un 
   `wa.me` del **cliente**, sin mensaje predefinido; no es el WhatsApp de la sucursal),
   entrega (dirección como texto, sin mapas), pago ("Efectivo", "Paga con", "Cambio
   aproximado" sobre el total conocido y aviso si el envío está por confirmar), productos
-  del **snapshot** de `order_items`, resumen (envío NULL = "Por confirmar", "Total sin
-  envío"), notas e historial.
+  del **snapshot** de `order_items` (badge «Mayoreo» u «Oferta» según `pricing_type`: la
+  regla con la que se cobró, no la actual), resumen (envío NULL = "Por confirmar", "Total
+  sin envío"), notas e historial.
 - **Historial**: lista cronológica (`<ol>`) con estado, fecha/hora de Mérida y quién:
   "Sistema" (`changed_by` NULL), "Tú (nombre)" o "Otro administrador" (la RLS de
   `profiles` solo deja leer el propio perfil; nunca se muestra un UUID).

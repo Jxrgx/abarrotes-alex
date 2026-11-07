@@ -18,6 +18,7 @@
     "test:e2e:store": "node --env-file=.env.local tests/e2e/storefront.mjs",
     "test:e2e:funnel": "node --env-file=.env.local tests/e2e/funnel.mjs",
     "test:e2e:pagination": "node --env-file=.env.local tests/e2e/pagination.mjs",
+    "test:e2e:wholesale": "node --env-file=.env.local tests/e2e/wholesale.mjs",
     "test:e2e:admin": "node --env-file=.env.local tests/e2e/admin-qa.mjs",
     "test:e2e:states": "node --env-file=.env.local tests/e2e/states.mjs",
     "test:e2e:dialogs": "node --env-file=.env.local tests/e2e/admin-dialogs.mjs",

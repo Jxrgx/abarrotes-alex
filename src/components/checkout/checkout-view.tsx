@@ -609,8 +609,14 @@ function CheckoutSummary({
                 </p>
                 {line.status === "soldOut" && <Badge variant="soldOut" className="mt-1">Agotado</Badge>}
                 {line.status === "unavailable" && <Badge variant="soldOut" className="mt-1">Ya no disponible</Badge>}
-                {line.status === "ok" && line.info?.promoPriceCents != null && (
+                {/* Misma regla que el carrito y create_order: la etiqueta es la que fija el precio. */}
+                {line.status === "ok" && line.pricingType === "promotion" && (
                   <Badge variant="offer" className="mt-1">Oferta</Badge>
+                )}
+                {line.status === "ok" && line.pricingType === "wholesale" && (
+                  <Badge variant="brand" className="mt-1">
+                    Mayoreo · {formatCents(line.unitCents)} c/u
+                  </Badge>
                 )}
               </div>
               {line.status === "ok" && (

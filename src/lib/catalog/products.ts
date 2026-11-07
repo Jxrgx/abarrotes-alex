@@ -2,10 +2,11 @@ import { cache } from "react";
 
 import { formatPresentation, formatUnit } from "@/lib/format";
 import { getPublicSupabase } from "@/lib/supabase/public";
-import type { Database } from "@/types/database";
+import type { Database, Json } from "@/types/database";
 
 import { catalogQueryError } from "./errors";
 import type { SortOrder } from "./filters";
+import { toCents, type WholesaleTier } from "./pricing";
 
 type SaleType = Database["public"]["Enums"]["sale_type"];
 type ProductUnit = Database["public"]["Enums"]["product_unit"];
@@ -30,6 +31,8 @@ export type CatalogProduct = {
   price: number;
   /** Precio promocional visible (RLS ya filtra vigencia); null si no hay oferta. */
   promoPrice: number | null;
+  /** Niveles de mayoreo aplicables (centavos), por cantidad mínima. Vacío si no hay. */
+  wholesaleTiers: WholesaleTier[];
   category: { name: string; slug: string };
   subcategory: { name: string; slug: string };
 };
@@ -49,7 +52,7 @@ export const CATALOG_PAGE_SIZE = (() => {
 // efectivo calculado en la base. Así filtro, orden GLOBAL, conteo y paginación ocurren
 // en PostgreSQL y nunca se descarga el catálogo completo.
 const CATALOG_SELECT =
-  "id, branch_id, product_id, price, is_available, name, slug, presentation, unit, sale_type, image_path, is_featured, brand_name, brand_slug, subcategory_name, subcategory_slug, category_name, category_slug, promo_price";
+  "id, branch_id, product_id, price, is_available, name, slug, presentation, unit, sale_type, image_path, is_featured, brand_name, brand_slug, subcategory_name, subcategory_slug, category_name, category_slug, promo_price, wholesale_tiers";
 
 
 export type CatalogQuery = {
@@ -191,6 +194,7 @@ type CatalogSelected = Pick<
   | "category_name"
   | "category_slug"
   | "promo_price"
+  | "wholesale_tiers"
 >;
 
 function toCatalogProduct(row: CatalogSelected): CatalogProduct {
@@ -211,9 +215,23 @@ function toCatalogProduct(row: CatalogSelected): CatalogProduct {
     price: row.price,
     // La vista ya aplica la regla: promoción vigente más baja solo si es menor al precio.
     promoPrice: row.promo_price,
+    wholesaleTiers: parseWholesaleTiers(row.wholesale_tiers),
     category: { name: row.category_name, slug: row.category_slug },
     subcategory: { name: row.subcategory_name, slug: row.subcategory_slug },
   };
+}
+
+// jsonb de la vista ([{ min, max, price }]). Defensivo: descarta elementos malformados.
+export function parseWholesaleTiers(value: Json | null): WholesaleTier[] {
+  if (!Array.isArray(value)) return [];
+  const tiers: WholesaleTier[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const { min, max, price } = item as Record<string, unknown>;
+    if (!Number.isInteger(min) || (max !== null && !Number.isInteger(max)) || typeof price !== "number") continue;
+    tiers.push({ minQuantity: min as number, maxQuantity: max as number | null, unitPriceCents: toCents(price) });
+  }
+  return tiers.sort((a, b) => a.minQuantity - b.minQuantity);
 }
 
 function priceUnitFor(saleType: SaleType, unit: ProductUnit | null) {

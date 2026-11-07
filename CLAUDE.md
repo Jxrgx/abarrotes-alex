@@ -11,6 +11,7 @@
 - Panel administrativo (navegación, dashboard, métricas, zona horaria): [docs/admin.md](docs/admin.md)
 - Imágenes de producto (Storage, bucket, paths, procesamiento con sharp): [docs/storage.md](docs/storage.md)
 - Promociones (semántica de vigencia, solapamiento, estados, zona horaria): [docs/promotions.md](docs/promotions.md)
+- Precios por mayoreo (niveles por cantidad, regla única de precio, «Requiere revisión», `pricing_type`): [docs/wholesale.md](docs/wholesale.md)
 - Seguridad (amenazas, headers/CSP, límites de endpoints, secretos, PII, checklist de producción): [docs/security.md](docs/security.md)
 - Producción (inventario, datos del cliente, plan de limpieza, variables, go-live): [docs/production.md](docs/production.md)
 - Notificaciones de pedidos (PWA, Web Push, VAPID, Realtime, idempotencia): [docs/notifications.md](docs/notifications.md)

@@ -10,6 +10,7 @@
 | `npm run test:e2e:admin` | Panel con sesión real, **solo lectura**: dashboard, teclado (skip link, menú móvil, diálogos con trampa de foco y Escape), formularios enviados solo vacíos y cerrados sin guardar, estado del producto `__E2E__`, pedidos (ALEX-000003 terminal), responsive 320–1440 y zoom 200 % | App corriendo, Chrome, `.env.local` |
 | `npm run test:e2e:funnel` | Recorrido de compra guiado a 390 px táctil (y 320/430/768/1440): hero, Agregar → barra "Ver mi pedido" (no tapa el footer, se oculta al escribir y bajo diálogos), carrito "Tu pedido", checkout por secciones (domicilio/recoger, numeración, errores con foco visible bajo el header) y confirmación con comprobante **sintético**. `/api/pedidos` se aborta (0 pedidos) | App corriendo, Chrome |
 | `npm run test:e2e:pagination` | Paginación con varias páginas sobre el catálogo semilla: Siguiente/Anterior, `aria-current`, primera/última deshabilitadas, sin repetidos, atrás/adelante/refresh, reset a página 1 al buscar u ordenar, **orden por precio global** entre páginas, página inexistente, carrito y móvil. Solo lectura | Instancia local con `QA_CATALOG_PAGE_SIZE=4` (`QA_CATALOG_PAGE_SIZE=4 npx next start -p 3102`) |
+| `npm run test:e2e:wholesale` | Precios por mayoreo sobre el catálogo **sintético** del modo `fixture`: tarjetas (oferta + mayoreo, rango acotado, agotado, por peso), stepper 1→2→3→2, anuncios `aria-live`, carrito 2→3→2→6→12 (subtotales al instante), `localStorage` sin precios, checkout (petición interceptada: solo ids y cantidades), confirmación con snapshot, 320–1440 y panel (editor de niveles, por peso, detalle del pedido) **sin guardar**. 0 datos creados | Instancia local con `fault-injection.mjs` en modo `fixture` (ver abajo) |
 | `npm run test:e2e:notifications` | PWA y avisos de pedidos: manifest solo en el panel, Service Worker registrado sin pedir permiso, tarjeta de notificaciones y un push **sintético** entregado por Chrome (CDP) al SW (aviso en la app con el panel visible; notificación del sistema fuera). Sin pedidos ni pushes reales | App corriendo, Chrome, `.env.local` |
 | `npm run test:e2e:dialogs` | `AdminDialog` en todos los módulos (Nueva/Editar/Duplicar y confirmación) a 320, 375, 390 y 430 (táctil) y 768/1440 (modal), **solo lectura**: hoja anclada al fondo, una sola zona de scroll, título y acciones visibles, sin foco en campos de texto al abrir en táctil, Esc y retorno del foco, y **teclado y barra de iOS 26 simulados** (`visualViewport`/`innerHeight` reducidos). Chromium no reproduce Safari iOS: la prueba final es en un iPhone físico | App corriendo, Chrome, `.env.local` |
 | `npm run test:e2e:states` | Estados de error y vacíos con Supabase **simulado** caído o vacío (ver abajo) | Instancia local con `fault-injection.mjs` |
@@ -51,6 +52,24 @@ $env:E2E_BASE_URL = "http://localhost:3101"; npm run test:e2e:states
 ```
 
 Solo bloquea o simula lecturas; no escribe en la base. Al terminar deja el modo en `off`.
+
+### Modo `fixture` (catálogo sintético para QA visual)
+
+Con la base real vacía, `fixture` sirve desde la memoria del proceso local un catálogo de
+ejemplo (`tests/e2e/fixture-data.mjs`: productos con mayoreo, oferta, agotado y por peso,
+más un pedido de ejemplo para el panel). En ese modo **toda escritura REST (POST/PATCH/
+DELETE y RPC) se bloquea** con 403; Auth y las lecturas que no simula van a la base real.
+
+```powershell
+npm run build
+$env:QA_FAULT_FILE = "$env:TEMPqa-fault.txt"; Set-Content $env:QA_FAULT_FILE fixture -NoNewline
+$env:NODE_OPTIONS = "--import ./tests/e2e/fault-injection.mjs"; npx next start -p 3101
+# en otra terminal:
+$env:E2E_BASE_URL = "http://localhost:3101"; npm run test:e2e:wholesale
+```
+
+La instancia debe usar una base con la migración de mayoreo aplicada (el catálogo y el
+detalle de pedidos sintéticos no tocan la base, pero el resto de las lecturas sí).
 
 ## Navegadores
 

@@ -118,6 +118,11 @@ input → debounce 250 ms → URL (?q=…, página 1) → Server Component consu
   predeterminado: categoría, subcategoría, nombre, presentación, `id`; por precio:
   `effective_price` asc/desc, nombre, presentación, `id` (desempate estable: las páginas
   no repiten ni saltan productos).
+- **Mayoreo** (migración `…20261108000100`): columna `wholesale_tiers` (jsonb, niveles
+  aplicables por cantidad mínima) en la misma fila: la tarjeta lo muestra sin consultas
+  extra (sin N+1, probado con 1600 productos). `effective_price` **no cambia**: sigue
+  siendo el precio de **1 unidad** (`min(normal, promoción)`) y es el que ordena «Precio
+  menor/mayor». Ofertas (`onSale`) = solo promociones. Ver [wholesale.md](wholesale.md).
 - Página más allá del final: PostgREST responde `PGRST103`; se hace un conteo `head` y la
   página muestra «Esta página no existe».
 - **Inicio**: Ofertas y Destacados piden 12 cada una y "Nuestros productos" 24, con

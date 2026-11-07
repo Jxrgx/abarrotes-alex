@@ -67,6 +67,21 @@ before(async () => {
     from branch_products bp join products p on p.id = bp.product_id
     where p.slug like 'vol-producto-%' and p.presentation::int % 5 = 2;
   `);
+  // Mayoreo (migración 20261108000100): 2 niveles en 1 de cada 3 productos; en otro grupo el
+  // precio normal baja después y su nivel queda «Requiere revisión» (la tienda no lo ve).
+  await ctx.db.exec(`
+    insert into wholesale_prices (branch_product_id, min_quantity, max_quantity, unit_price)
+    select bp.id, 3, 5, round(bp.price * 0.9, 2) from branch_products bp join products p on p.id = bp.product_id
+    where p.slug like 'vol-producto-%' and p.presentation::int % 3 = 0;
+    insert into wholesale_prices (branch_product_id, min_quantity, max_quantity, unit_price)
+    select bp.id, 6, null, round(bp.price * 0.8, 2) from branch_products bp join products p on p.id = bp.product_id
+    where p.slug like 'vol-producto-%' and p.presentation::int % 3 = 0;
+    insert into wholesale_prices (branch_product_id, min_quantity, max_quantity, unit_price)
+    select bp.id, 4, null, round(bp.price * 0.9, 2) from branch_products bp join products p on p.id = bp.product_id
+    where p.slug like 'vol-producto-%' and p.presentation::int % 3 = 1 and p.presentation::int % 7 = 0;
+    update branch_products bp set price = round(bp.price * 0.85, 2) from products p
+    where p.id = bp.product_id and p.slug like 'vol-producto-%' and p.presentation::int % 3 = 1 and p.presentation::int % 7 = 0;
+  `);
 });
 
 // Lo que la tienda debe ver, calculado de forma independiente (como superusuario).
@@ -193,6 +208,43 @@ describe("búsqueda por prefijo de palabra (sin acentos) + filtros", () => {
     const page2 = await anon(`select effective_price from catalog_items where ${where} order by ${ORDER_PRICE("asc")} limit ${PAGE} offset ${PAGE}`, [BRANCH, "agua"]);
     const all = await anon(`select effective_price from catalog_items where ${where} order by ${ORDER_PRICE("asc")}`, [BRANCH, "agua"]);
     assert.deepEqual(page2.map((row) => row.effective_price), all.slice(PAGE, PAGE * 2).map((row) => row.effective_price));
+  });
+
+  test("mayoreo viaja en la misma consulta paginada; el orden por precio usa 1 unidad; Ofertas = promociones", async () => {
+    const [{ n: total }] = await anon(`select count(*)::int n from catalog_items where branch_id = $1`, [BRANCH]);
+    const expected = new Map(
+      (await ctx.db.query(`
+        select bp.id, (select count(*)::int from wholesale_prices w where w.branch_product_id = bp.id and w.unit_price < bp.price) tiers
+        from branch_products bp where bp.branch_id = $1`, [BRANCH])).rows.map((row) => [row.id, row.tiers]),
+    );
+    let withTiers = 0;
+    for (let page = 1; page <= Math.ceil(total / PAGE); page++) {
+      const rows = await anon(`select id, price, effective_price, wholesale_tiers from catalog_items where branch_id = $1 order by ${ORDER_PRICE("asc")} limit ${PAGE} offset ${(page - 1) * PAGE}`, [BRANCH]);
+      for (const row of rows) {
+        const tiers = row.wholesale_tiers ?? [];
+        assert.equal(tiers.length, expected.get(row.id), `niveles de ${row.id}`);
+        if (tiers.length) {
+          withTiers += 1;
+          assert.deepEqual(tiers.map((tier) => [tier.min, tier.max]), [[3, 5], [6, null]], "orden por cantidad mínima");
+          assert.ok(tiers.every((tier) => tier.price < Number(row.price)), "solo niveles menores al normal");
+          assert.ok(Number(row.effective_price) <= Number(row.price), "1 unidad: normal o promoción");
+          assert.ok(tiers.some((tier) => tier.price < Number(row.effective_price)) || Number(row.effective_price) < Number(row.price), "el mayoreo no altera el precio de 1 unidad");
+        }
+      }
+    }
+    assert.ok(withTiers > 300, `productos con mayoreo visibles: ${withTiers}`);
+    const review = (await ctx.db.query(`select count(*)::int n from wholesale_prices w join branch_products bp on bp.id = w.branch_product_id where w.unit_price >= bp.price`)).rows[0].n;
+    assert.ok(review > 0, "hay niveles «Requiere revisión» en el dataset");
+    const [{ n: onSale }] = await anon(`select count(*)::int n from catalog_items where branch_id = $1 and promo_price is not null`, [BRANCH]);
+    // «Ofertas» (home) = productos con promoción vigente, nunca «solo mayoreo».
+    const [{ n: promos }] = (await ctx.db.query(`
+      select count(*)::int n from branch_products bp
+      join products p on p.id = bp.product_id and p.is_active
+      join subcategories s on s.id = p.subcategory_id and s.is_active
+      join categories c on c.id = s.category_id and c.is_active
+      where bp.branch_id = $1 and exists (select 1 from promotions pr where pr.branch_product_id = bp.id and pr.is_active
+        and (pr.starts_at is null or pr.starts_at <= now()) and (pr.ends_at is null or pr.ends_at > now()) and pr.promotional_price < bp.price)`, [BRANCH])).rows;
+    assert.equal(onSale, promos);
   });
 
   test("plan de consulta: una sola sentencia por página (sin N+1) y rápida con 1000+ productos", async () => {

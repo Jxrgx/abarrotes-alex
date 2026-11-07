@@ -96,8 +96,13 @@ lectura y no crea pedidos.
 - Respuesta en **centavos enteros** (`priceCents`, `promoPriceCents`). PostgREST
   entrega `numeric` como número JSON; se convierte en el servidor con
   `Math.round(valor * 100)` y todas las sumas se hacen con enteros.
-- Precio efectivo con la misma función que el catálogo (`effectivePrice` en
-  `src/lib/catalog/pricing.ts`): promoción visible si existe, si no el precio.
+- Cada producto trae además sus **niveles de mayoreo** aplicables (`wholesaleTiers`, en la
+  misma consulta). El precio de cada línea depende de su cantidad y se calcula en el
+  navegador con `resolveUnitPrice` (`src/lib/catalog/pricing.ts`, espejo de
+  `private.line_price`): mejor entre normal, promoción y mayoreo. Cambiar la cantidad
+  actualiza precio y subtotal **al instante**, sin otra consulta. El storage sigue
+  guardando solo `productId` + `quantity`; la base recalcula todo al crear el pedido.
+  Ver [wholesale.md](wholesale.md).
 - Solo se vuelve a consultar si aparecen ids nuevos o cambia la sucursal; cambiar
   cantidades o quitar productos no genera consultas.
 - Si la consulta falla: mensaje amigable + "Reintentar". El storage no se toca.

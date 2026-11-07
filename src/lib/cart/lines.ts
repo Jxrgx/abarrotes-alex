@@ -1,4 +1,4 @@
-import { effectivePrice } from "@/lib/catalog/pricing";
+import { type PricingType, type PriceRules, resolveUnitPrice } from "@/lib/catalog/pricing";
 
 import type { CartItem, CartProductInfo, CartResolveResponse, CartState } from "./schema";
 
@@ -20,9 +20,15 @@ export type CartLine = {
   item: CartItem;
   info: CartProductInfo | undefined;
   status: CartLineStatus;
-  /** Precio efectivo unitario en centavos (0 si no está disponible). */
+  /** Precio unitario para ESTA cantidad, en centavos (0 si no está disponible). */
   unitCents: number;
+  /** Regla que fija el precio mostrado (la base vuelve a calcularlo al crear el pedido). */
+  pricingType: PricingType;
 };
+
+export function priceRules(info: CartProductInfo): PriceRules {
+  return { priceCents: info.priceCents, promoPriceCents: info.promoPriceCents, wholesaleTiers: info.wholesaleTiers };
+}
 
 export function resolveCartLines(cart: CartState, resolution: CartResolution) {
   const lines: CartLine[] = cart.items.map((item) => {
@@ -31,9 +37,9 @@ export function resolveCartLines(cart: CartState, resolution: CartResolution) {
     if (!resolution.requested.has(item.productId)) status = "loading";
     else if (!info) status = "unavailable";
     else if (!info.isAvailable) status = "soldOut";
-    const unitCents =
-      info && status === "ok" ? effectivePrice({ price: info.priceCents, promoPrice: info.promoPriceCents }) : 0;
-    return { item, info, status, unitCents };
+    // Mismo cálculo que private.line_price (normal, promoción y mayoreo por cantidad).
+    const price = info && status === "ok" ? resolveUnitPrice(priceRules(info), item.quantity) : null;
+    return { item, info, status, unitCents: price?.unitCents ?? 0, pricingType: price?.pricingType ?? "normal" };
   });
 
   const payable = lines.filter((line) => line.status === "ok");

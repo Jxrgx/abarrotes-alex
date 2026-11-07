@@ -101,6 +101,14 @@ Las fechas se capturan con `<input type="datetime-local">` y se interpretan **si
   si falla, no se reactiva y se muestra el mensaje.
 - **Sin borrar** en la UI (la RLS de admin lo permite, pero se conserva la configuración).
 
+## Relación con el mayoreo
+
+Promociones y precios por mayoreo ([wholesale.md](wholesale.md)) son CRUD separados. Al
+cobrar gana el **mejor** precio unitario para la cantidad; en empate exacto gana la
+promoción. Una promoción nunca se bloquea porque el mayoreo pueda ser mejor. El badge
+«Oferta» y la sección Ofertas del inicio son solo para promociones. «Requiere revisión»
+funciona igual en ambos: si el precio normal baja, la regla deja de aplicarse sin borrarse.
+
 ## Relación con la tienda
 
 Cada mutación revalida `/admin/promociones`, `/admin/productos`, `/` y `/productos`. Como la

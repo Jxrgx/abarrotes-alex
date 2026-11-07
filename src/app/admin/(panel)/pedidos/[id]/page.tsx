@@ -118,7 +118,12 @@ async function OrderDetail({ params }: Pick<PageProps<"/admin/pedidos/[id]">, "p
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium">{item.name}</span>
                 {item.presentation && <span className="block text-xs text-subtle-foreground">{item.presentation}</span>}
-                <span className="block text-xs text-subtle-foreground tabular-nums">{formatCents(item.unitPriceCents)} c/u</span>
+                <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-subtle-foreground tabular-nums">
+                  {formatCents(item.unitPriceCents)} c/u
+                  {/* Snapshot: la regla con la que se cobró, no las reglas actuales. */}
+                  {item.pricingType === "wholesale" && <Badge variant="brand">Mayoreo</Badge>}
+                  {item.pricingType === "promotion" && <Badge variant="offer">Oferta</Badge>}
+                </span>
               </span>
               <span className="shrink-0 text-sm font-semibold tabular-nums">{formatCents(item.subtotalCents)}</span>
             </li>

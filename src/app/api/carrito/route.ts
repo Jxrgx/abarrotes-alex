@@ -11,7 +11,9 @@ import { CART_BODY_MAX_BYTES, readJsonBody } from "@/lib/http/json-body";
 // Resuelve la información pública ACTUAL de los productos de un carrito.
 // - Solo lectura: no crea pedidos ni modifica datos.
 // - Usa el cliente público de Supabase (RLS); nunca service_role.
-// - Una sola consulta por lote para todos los productos.
+// - Una sola consulta por lote para todos los productos (incluye los niveles de mayoreo;
+//   el precio por cantidad se calcula en el navegador con resolveUnitPrice, al instante
+//   al cambiar cantidades, sin otra consulta).
 // La respuesta es solo para mostrar el carrito. Al crear el pedido (Fase 6) el
 // servidor volverá a consultar todo; nada de esto se acepta como autoridad.
 export async function POST(request: Request) {
@@ -44,6 +46,7 @@ export async function POST(request: Request) {
           isAvailable: product.isAvailable,
           priceCents: toCents(product.price),
           promoPriceCents: product.promoPrice === null ? null : toCents(product.promoPrice),
+          wholesaleTiers: product.wholesaleTiers,
         }),
       ),
     };

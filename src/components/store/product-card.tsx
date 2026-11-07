@@ -1,11 +1,13 @@
 import { AddToCart } from "@/components/cart/add-to-cart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { type PriceRules, toCents, wholesaleHint } from "@/lib/catalog/pricing";
 import type { CatalogProduct } from "@/lib/catalog/products";
 import { cn } from "@/lib/utils";
 
 import { ProductImage } from "./product-image";
 import { ProductPrice } from "./product-price";
+import { WholesaleHint } from "./wholesale-hint";
 
 type ProductCardProps = {
   product: CatalogProduct;
@@ -17,6 +19,13 @@ export function ProductCard({ product, headingLevel: Heading = "h3" }: ProductCa
   const soldOut = !product.isAvailable;
   const hasOffer = product.promoPrice !== null;
   const imageAlt = [product.name, product.presentation].filter(Boolean).join(" ");
+  // Mayoreo: solo si algún nivel mejora el precio de 1 unidad (no se listan todos).
+  const rules: PriceRules = {
+    priceCents: toCents(product.price),
+    promoPriceCents: product.promoPrice === null ? null : toCents(product.promoPrice),
+    wholesaleTiers: product.wholesaleTiers,
+  };
+  const hasWholesale = wholesaleHint(rules, 1) !== null;
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-xl border bg-card transition-shadow duration-200 ease-out hover:shadow-card-hover">
@@ -57,6 +66,9 @@ export function ProductCard({ product, headingLevel: Heading = "h3" }: ProductCa
             priceUnit={product.priceUnit}
             muted={soldOut}
           />
+          {hasWholesale && (
+            <WholesaleHint className="mt-1.5" productId={product.productId} rules={rules} static={soldOut} />
+          )}
         </div>
 
         {soldOut ? (
@@ -69,6 +81,7 @@ export function ProductCard({ product, headingLevel: Heading = "h3" }: ProductCa
             productId={product.productId}
             branchId={product.branchId}
             label={imageAlt}
+            rules={hasWholesale ? rules : undefined}
           />
         )}
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowRight, RefreshCw, ShoppingCart, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowRight, RefreshCw, ShoppingCart, Tag, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -8,8 +8,8 @@ import { EmptyState } from "@/components/store/empty-state";
 import { ProductImage } from "@/components/store/product-image";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { effectivePrice } from "@/lib/catalog/pricing";
-import { type CartLineStatus, resolveCartLines } from "@/lib/cart/lines";
+import { type PricingType, wholesaleCartText, wholesaleHint } from "@/lib/catalog/pricing";
+import { type CartLineStatus, priceRules, resolveCartLines } from "@/lib/cart/lines";
 import type { CartProductInfo, CartState } from "@/lib/cart/schema";
 import { announceCart, countLabel, dispatchCart, useCart } from "@/lib/cart/store";
 import { formatCents } from "@/lib/format";
@@ -89,17 +89,24 @@ function CartLine({
   item,
   info,
   status,
+  unitCents,
+  pricingType,
 }: {
   item: CartState["items"][number];
   info: CartProductInfo | undefined;
   status: CartLineStatus;
+  /** Precio para la cantidad de esta línea (resolveCartLines). */
+  unitCents: number;
+  pricingType: PricingType;
 }) {
   if (status === "loading") return <LineSkeleton />;
 
   const label = info ? [info.name, info.presentation].filter(Boolean).join(" ") : "Producto";
-  const unitCents = info ? effectivePrice({ price: info.priceCents, promoPrice: info.promoPriceCents }) : 0;
-  const hasOffer = info?.promoPriceCents != null;
+  const discounted = pricingType !== "normal";
   const inactive = status !== "ok";
+  // "Agrega N más para obtener $X c/u" (siguiente nivel de mayoreo que mejora el precio).
+  const hint = info && status === "ok" ? wholesaleHint(priceRules(info), item.quantity) : null;
+  const nextTierText = hint ? wholesaleCartText(hint, formatCents) : null;
 
   function remove() {
     if (dispatchCart({ type: "remove", productId: item.productId })) {
@@ -132,18 +139,24 @@ function CartLine({
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               {status === "ok" && info && (
                 <p className="text-sm text-muted-foreground tabular-nums">
-                  <span className="sr-only">Precio unitario: </span>
+                  <span className="sr-only">{pricingType === "wholesale" ? "Precio mayoreo: " : "Precio unitario: "}</span>
                   {formatCents(unitCents)}
                   {info.priceUnit ? `/${info.priceUnit}` : " c/u"}
-                  {hasOffer && (
+                  {discounted && (
                     <s className="ml-1.5 text-subtle-foreground">
-                      <span className="sr-only">Precio anterior: </span>
+                      <span className="sr-only">Precio normal: </span>
                       {formatCents(info.priceCents)}
                     </s>
                   )}
                 </p>
               )}
-              {status === "ok" && hasOffer && <Badge variant="offer">Oferta</Badge>}
+              {status === "ok" && pricingType === "promotion" && <Badge variant="offer">Oferta</Badge>}
+              {status === "ok" && pricingType === "wholesale" && (
+                <Badge variant="brand">
+                  <Tag aria-hidden="true" />
+                  Mayoreo
+                </Badge>
+              )}
               {status === "soldOut" && <Badge variant="soldOut">Agotado</Badge>}
               {status === "unavailable" && <Badge variant="soldOut">Ya no disponible</Badge>}
             </div>
@@ -155,6 +168,13 @@ function CartLine({
             </p>
           )}
         </div>
+
+        {nextTierText && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-4 text-primary-dark">
+            <Tag className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+            {nextTierText}
+          </p>
+        )}
 
         {inactive && (
           <p className="mt-2 text-sm text-destructive-strong">

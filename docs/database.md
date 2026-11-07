@@ -75,6 +75,7 @@ Reglas:
 | `products`             | Catálogo global (sin precio, sin categoría directa; marca opcional)      |
 | `branch_products`      | Precio y disponibilidad de un producto en una sucursal                   |
 | `promotions`           | Precio promocional de un `branch_product`, con vigencia opcional         |
+| `wholesale_prices`     | Precio por mayoreo (por cantidad) de un `branch_product` ([wholesale.md](wholesale.md)) |
 | `orders`               | Pedido de un cliente a una sucursal                                      |
 | `order_items`          | Partidas del pedido (snapshot histórico)                                 |
 | `order_status_history` | Bitácora de cambios de estado del pedido                                 |
@@ -89,6 +90,7 @@ erDiagram
   branches ||--o{ branch_products : vende
   products ||--o{ branch_products : "se vende en"
   branch_products ||--o{ promotions : promociona
+  branch_products ||--o{ wholesale_prices : "mayoreo"
   branches ||--o{ orders : recibe
   orders ||--|{ order_items : contiene
   products ||--o{ order_items : "referencia"
@@ -161,7 +163,9 @@ sucursal no requiere cambios de esquema.
 ## Snapshots en `order_items`
 
 Cada partida copia `product_name`, `product_presentation` (texto, p. ej.
-`"600 ml"`), `unit_price`, `quantity` y `subtotal` al crear el pedido.
+`"600 ml"`), `unit_price`, `quantity`, `subtotal` y `pricing_type` (`normal` ·
+`promotion` · `wholesale`; NULL solo en partidas anteriores a la migración
+`…20261108000100`, obligatorio en las nuevas por un `CHECK … NOT VALID`) al crear el pedido.
 `product_id` se conserva como referencia, pero un pedido histórico **nunca** se
 reconstruye con precios o nombres actuales. Verificado: cambiar precio, nombre
 o desactivar el producto no altera la partida.
@@ -191,6 +195,7 @@ La regla general es **desactivar** (`is_active = false`), no borrar.
 | `branch_hours.branch_id`                    | CASCADE    | Configuración propia de la sucursal                           |
 | `branch_products.branch_id` / `product_id`  | CASCADE    | Precio por sucursal; solo aplica si no hay pedidos que lo impidan |
 | `promotions.branch_product_id`              | CASCADE    | La promoción no existe sin su producto de sucursal            |
+| `wholesale_prices.branch_product_id`        | CASCADE    | Los niveles de mayoreo no existen sin su producto de sucursal |
 | `orders.branch_id`                          | RESTRICT   | Una sucursal con pedidos no se puede borrar                   |
 | `order_items.order_id`                      | CASCADE    | Las partidas son parte del pedido                             |
 | `order_items.product_id`                    | RESTRICT   | Un producto vendido no se puede borrar: se desactiva          |

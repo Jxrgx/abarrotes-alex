@@ -106,6 +106,12 @@ export function OrderConfirmation({ folio }: { folio: string }) {
               <span>
                 <span className="tabular-nums">{item.quantity} ×</span>{" "}
                 {[item.name, item.presentation].filter(Boolean).join(" ")}
+                {/* Snapshot del pedido: no se consultan las reglas actuales. */}
+                {item.pricingType === "wholesale" && (
+                  <span className="block text-xs text-primary-dark">
+                    Precio mayoreo · {formatCents(item.unitPriceCents)} c/u
+                  </span>
+                )}
               </span>
               <span className="shrink-0 tabular-nums">{formatCents(item.subtotalCents)}</span>
             </li>
